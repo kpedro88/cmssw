@@ -7,8 +7,10 @@
 #include "G4ComptonScattering.hh"
 #include "G4GammaConversion.hh"
 #include "G4PhotoElectricEffect.hh"
+#include "G4LivermorePhotoElectricModel.hh"
 
 #include "G4eMultipleScattering.hh"
+#include "G4GoudsmitSaundersonMscModel.hh"
 #include "G4eIonisation.hh"
 #include "G4eBremsstrahlung.hh"
 #include "G4eplusAnnihilation.hh"
@@ -60,19 +62,32 @@ void DummyEMPhysics::ConstructProcess() {
 
   G4ParticleDefinition* particle = G4Gamma::Gamma();
 
-  ph->RegisterProcess(new G4PhotoElectricEffect(), particle);
+  G4PhotoElectricEffect* thePhotoElectricEffect = new G4PhotoElectricEffect();
+  G4double LivermoreLowEnergyLimit  = 1.*eV;
+  G4double LivermoreHighEnergyLimit = 1.*TeV;
+  G4LivermorePhotoElectricModel* theLivermorePhotoElectricModel = new G4LivermorePhotoElectricModel();
+  theLivermorePhotoElectricModel->SetLowEnergyLimit(LivermoreLowEnergyLimit);
+  theLivermorePhotoElectricModel->SetHighEnergyLimit(LivermoreHighEnergyLimit);
+  thePhotoElectricEffect->AddEmModel(0, theLivermorePhotoElectricModel);
+  ph->RegisterProcess(thePhotoElectricEffect, particle);
   ph->RegisterProcess(new G4ComptonScattering(), particle);
   ph->RegisterProcess(new G4GammaConversion(), particle);
 
   particle = G4Electron::Electron();
 
-  ph->RegisterProcess(new G4eMultipleScattering(), particle);
+  G4eMultipleScattering* msc         = new G4eMultipleScattering;
+  G4GoudsmitSaundersonMscModel* msc1 = new G4GoudsmitSaundersonMscModel();
+  msc->AddEmModel(0, msc1);
+  ph->RegisterProcess(msc, particle);
   ph->RegisterProcess(new G4eIonisation(), particle);
   ph->RegisterProcess(new G4eBremsstrahlung(), particle);
 
   particle = G4Positron::Positron();
 
-  ph->RegisterProcess(new G4eMultipleScattering(), particle);
+  G4eMultipleScattering* mscp         = new G4eMultipleScattering;
+  G4GoudsmitSaundersonMscModel* mscp1 = new G4GoudsmitSaundersonMscModel();
+  mscp->AddEmModel(0, mscp1);
+  ph->RegisterProcess(mscp, particle);
   ph->RegisterProcess(new G4eIonisation(), particle);
   ph->RegisterProcess(new G4eBremsstrahlung(), particle);
   ph->RegisterProcess(new G4eplusAnnihilation(), particle);

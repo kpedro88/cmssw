@@ -30,33 +30,33 @@
   class GBRTree {
 
     public:
+       struct GBRNode {
+         GBRNode() : fCutIndex(0), fCutVal(0), fLeftIndex(0), fRightIndex(0) {}
+         GBRNode(unsigned cutIndex, float cutVal, int leftIndex, int rightIndex) :
+           fCutIndex(cutIndex), fCutVal(cutVal), fLeftIndex(leftIndex), fRightIndex(rightIndex) {}
+
+         unsigned fCutIndex;
+         float fCutVal;
+         int fLeftIndex;
+         int fRightIndex;
+
+         COND_SERIALIZABLE;
+       };
 
        GBRTree();
        explicit GBRTree(int nIntermediate, int nTerminal);
        
        double GetResponse(const float* vector) const;
+
+       std::vector<GBRNode> &Nodes() { return fNodes; }
+       const std::vector<GBRNode> &Nodes() const { return fNodes; }
        
        std::vector<float> &Responses() { return fResponses; }       
        const std::vector<float> &Responses() const { return fResponses; }
        
-       std::vector<unsigned char> &CutIndices() { return fCutIndices; }
-       const std::vector<unsigned char> &CutIndices() const { return fCutIndices; }
-       
-       std::vector<float> &CutVals() { return fCutVals; }
-       const std::vector<float> &CutVals() const { return fCutVals; }
-       
-       std::vector<int> &LeftIndices() { return fLeftIndices; }
-       const std::vector<int> &LeftIndices() const { return fLeftIndices; } 
-       
-       std::vector<int> &RightIndices() { return fRightIndices; }
-       const std::vector<int> &RightIndices() const { return fRightIndices; }
-
     protected:      
 
-       std::vector<unsigned char> fCutIndices;
-       std::vector<float> fCutVals;
-       std::vector<int> fLeftIndices;
-       std::vector<int> fRightIndices;
+       std::vector<GBRNode> fNodes;
        std::vector<float> fResponses;  
         
   
@@ -68,9 +68,9 @@ inline double GBRTree::GetResponse(const float* vector) const
 {
    int index = 0;
    do {
-      auto r = fRightIndices[index];
-      auto l = fLeftIndices[index];  
-     index =  vector[fCutIndices[index]] > fCutVals[index] ? r : l;
+      auto r = fNodes[index].fRightIndex;
+      auto l = fNodes[index].fLeftIndex;
+     index =  vector[fNodes[index].fCutIndex] > fNodes[index].fCutVal ? r : l;
    } while (index>0);
    return fResponses[-index];
 }

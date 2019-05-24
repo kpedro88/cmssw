@@ -11,6 +11,7 @@ namespace CondFormats_EgammaObjects {
     std::vector<ElectronLikelihoodCalibration::Entry>::iterator d1;
     std::vector<ElectronLikelihoodCalibration::Entry>::const_iterator d2;
     GBRTree e1;
+    GBRTree::GBRNode n1;
     GBRForest e2;
     GBRTree2D e3;
     GBRForest2D e4;

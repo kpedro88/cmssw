@@ -8,8 +8,21 @@
     <field name="fTrees" mapping="blob"/>
   </class>
   <class name="std::vector<GBRTree>"/>
-  <class name="GBRTree" ClassVersion="3">
+  <class name="GBRNode"/>
+  <class name="GBRTree" ClassVersion="4">
+    <version ClassVersion="4" checksum="253018518"/>
     <version ClassVersion="3" checksum="2333733795"/>
+    <ioread sourceClass="GBRTree" version="[-3]"
+      source="std::vector<unsigned char> fCutIndices; std::vector<float> fCutVals; std::vector<int> fLeftIndices; std::vector<int> fRightIndices; std::vector<float> fResponses;"
+      targetClass="GBRTree"
+      target="fNodes">
+      <![CDATA[
+        fNodes.reserve(onfile.fCutIndices.size());
+        for(unsigned i = 0; i < onfile.fCutIndices.size(); ++i){
+          fNodes.emplace_back(onfile.fCutIndices[i],onfile.fCutVals[i],onfile.fLeftIndices[i],onfile.fRightIndices[i]);
+        }
+      ]]>
+    </ioread>
   </class>
   <class name="GBRForest2D" class_version = "0">
     <field name="fTrees" mapping="blob"/>

@@ -6,7 +6,7 @@
   <class name="std::vector<ElectronLikelihoodCalibration::Entry>"/>     
   <class name="GBRForest" class_version = "4">
     <field name="fTrees" mapping="blob"/>
-    <field name="fTreesNew" mapping="blob"/>
+    <field name="fTreesNew" transient="true"/>
     <ioread sourceClass="GBRForest" version="[-3]" targetClass="GBRForest" source="" target="">
       <![CDATA[
         newObj->initNewTrees();

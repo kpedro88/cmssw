@@ -49,7 +49,7 @@ namespace {
     return count > 0 ? count : 1;
   }
 
-  void addNode(GBRTreeNew& tree,
+  void addNode(GBRTree& tree,
                tinyxml2::XMLElement* node,
                double scale,
                bool isRegression,
@@ -75,7 +75,7 @@ namespace {
       response *= scale;
       tree.Responses().push_back(response);
     } else {
-      int thisidx = tree.Nodes().size();
+      int thisidx = tree.CutIndices().size();
 
       int selector;
       float cutval;
@@ -85,12 +85,16 @@ namespace {
       node->QueryFloatAttribute("Cut", &cutval);
       node->QueryBoolAttribute("cType", &ctype);
 
+      tree.CutIndices().push_back(static_cast<unsigned char>(selector));
+
       //newer tmva versions use >= instead of > in decision tree splits, so adjust cut value
       //to reproduce the correct behaviour
       if (adjustboundary) {
         cutval = std::nextafter(cutval, std::numeric_limits<float>::lowest());
       }
-      tree.Nodes().emplace_back(static_cast<unsigned char>(selector),cutval,0,0);
+      tree.CutVals().push_back(cutval);
+      tree.LeftIndices().push_back(0);
+      tree.RightIndices().push_back(0);
 
       tinyxml2::XMLElement* left = nullptr;
       tinyxml2::XMLElement* right = nullptr;
@@ -104,10 +108,10 @@ namespace {
         std::swap(left, right);
       }
 
-      tree.Nodes()[thisidx].fLeftIndex = isTerminal(left) ? -tree.Responses().size() : tree.Nodes().size();
+      tree.LeftIndices()[thisidx] = isTerminal(left) ? -tree.Responses().size() : tree.CutIndices().size();
       addNode(tree, left, scale, isRegression, useYesNoLeaf, adjustboundary, isAdaClassifier);
 
-      tree.Nodes()[thisidx].fRightIndex = isTerminal(right) ? -tree.Responses().size() : tree.Nodes().size();
+      tree.RightIndices()[thisidx] = isTerminal(right) ? -tree.Responses().size() : tree.CutIndices().size();
       addNode(tree, right, scale, isRegression, useYesNoLeaf, adjustboundary, isAdaClassifier);
     }
   }
@@ -221,12 +225,17 @@ namespace {
       addNode(tree, root, scale, isRegression, useYesNoLeaf, adjustBoundaries, isAdaClassifier);
 
       //special case, root node is terminal, create fake intermediate node at root
-      if (tree.Nodes().empty()) {
-        tree.Nodes().emplace_back(0,0,0,0);
+      if (tree.CutIndices().empty()) {
+        tree.CutIndices().push_back(0);
+        tree.CutVals().push_back(0);
+        tree.LeftIndices().push_back(0);
+        tree.RightIndices().push_back(0);
       }
 
       ++itree;
     }
+
+    forest->initNewTrees();
 
     return forest;
   }

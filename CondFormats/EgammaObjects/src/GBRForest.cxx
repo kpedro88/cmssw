@@ -12,6 +12,4 @@ void GBRForest::initNewTrees() {
   for(const auto& tree : fTrees){
      fTreesNew.emplace_back(tree);
   }
-  fTrees.clear();
-  fTrees.shrink_to_fit();
 }

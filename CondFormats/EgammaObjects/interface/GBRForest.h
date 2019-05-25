@@ -38,8 +38,8 @@
        
        void SetInitialResponse(double response) { fInitialResponse = response; }
        
-       std::vector<GBRTreeNew> &Trees() { return fTreesNew; }
-       const std::vector<GBRTreeNew> &Trees() const { return fTreesNew; }
+       std::vector<GBRTree> &Trees() { return fTrees; }
+       const std::vector<GBRTree> &Trees() const { return fTrees; }
 
        void initNewTrees();
 
@@ -47,7 +47,7 @@
 
        double               fInitialResponse;
        std::vector<GBRTree> fTrees;
-       std::vector<GBRTreeNew> fTreesNew;
+       std::vector<GBRTreeNew> fTreesNew COND_TRANSIENT;
 
        friend struct GBRForestInitializeNewTrees;
   

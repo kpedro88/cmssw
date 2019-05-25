@@ -11,6 +11,6 @@
 using namespace PhysicsTools::Calibration;
 
 REGISTER_PLUGIN(ElectronLikelihoodPdfsRcd, ElectronLikelihoodCalibration);
-REGISTER_PLUGIN(GBRWrapperRcd, GBRForest);
+REGISTER_PLUGIN_INIT(GBRWrapperRcd,GBRForest,GBRForestInitializeNewTrees);
 REGISTER_PLUGIN(GBRDWrapperRcd, GBRForestD);
 REGISTER_PLUGIN(PhotonConversionMVAComputerRcd, MVAComputerContainer);

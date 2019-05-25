@@ -2,6 +2,7 @@
 #include "CondFormats/EgammaObjects/interface/ElectronLikelihoodCategoryData.h"
 #include "CondFormats/EgammaObjects/interface/ElectronLikelihoodCalibration.h"
 #include "CondFormats/EgammaObjects/interface/GBRTree.h"
+#include "CondFormats/EgammaObjects/interface/GBRTreeNew.h"
 #include "CondFormats/EgammaObjects/interface/GBRForest.h"
 #include "CondFormats/EgammaObjects/interface/GBRTree2D.h"
 #include "CondFormats/EgammaObjects/interface/GBRForest2D.h"

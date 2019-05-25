@@ -44,7 +44,8 @@
 
        double               fInitialResponse;
        std::vector<GBRTree> fTrees;  
-      
+
+       friend struct GBRForestInitializeTreeNodes;      
   
   COND_SERIALIZABLE;
 };
@@ -63,5 +64,20 @@ inline double GBRForest::GetGradBoostClassifier(const float* vector) const {
   double response = GetResponse(vector);
   return 2.0/(1.0+exp(-2.0*response))-1; //MVA output between -1 and 1
 }
+
+struct GBRForestInitializeTreeNodes {
+  void operator()(GBRForest& forest){
+    for(auto& tree : forest.fTrees){
+      tree.Nodes().reserve(tree.CutIndices().size());
+      for(unsigned i = 0; i < tree.CutIndices().size(); ++i){
+        tree.Nodes().emplace_back(tree.CutIndices()[i],tree.CutVals()[i],tree.LeftIndices()[i],tree.RightIndices()[i]);
+      }
+      tree.CutIndices().clear();
+      tree.CutVals().clear();
+      tree.LeftIndices().clear();
+      tree.RightIndices().clear();
+    }
+  }
+};
 
 #endif

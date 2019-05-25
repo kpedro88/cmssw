@@ -49,7 +49,7 @@ namespace {
     return count > 0 ? count : 1;
   }
 
-  void addNode(GBRTree& tree,
+  void addNode(GBRTreeNew& tree,
                tinyxml2::XMLElement* node,
                double scale,
                bool isRegression,
@@ -215,7 +215,7 @@ namespace {
       double scale = isAdaClassifier ? boostWeights[itree] / norm : 1.0;
 
       tinyxml2::XMLElement* root = e->FirstChildElement("Node");
-      forest->Trees().push_back(GBRTree(countIntermediateNodes(root), countTerminalNodes(root)));
+      forest->Trees().emplace_back(countIntermediateNodes(root), countTerminalNodes(root));
       auto& tree = forest->Trees().back();
 
       addNode(tree, root, scale, isRegression, useYesNoLeaf, adjustBoundaries, isAdaClassifier);

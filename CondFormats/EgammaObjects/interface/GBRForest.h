@@ -18,6 +18,7 @@
 
 #include "CondFormats/Serialization/interface/Serializable.h"
 #include "CondFormats/EgammaObjects/interface/GBRTree.h"
+#include "CondFormats/EgammaObjects/interface/GBRTreeNew.h"
 
 #include <vector>
 #include <cmath>
@@ -37,15 +38,18 @@
        
        void SetInitialResponse(double response) { fInitialResponse = response; }
        
-       std::vector<GBRTree> &Trees() { return fTrees; }
-       const std::vector<GBRTree> &Trees() const { return fTrees; }
+       std::vector<GBRTreeNew> &Trees() { return fTreesNew; }
+       const std::vector<GBRTreeNew> &Trees() const { return fTreesNew; }
+
+       void initNewTrees();
 
     protected:
 
        double               fInitialResponse;
-       std::vector<GBRTree> fTrees;  
+       std::vector<GBRTree> fTrees;
+       std::vector<GBRTreeNew> fTreesNew;
 
-       friend struct GBRForestInitializeTreeNodes;      
+       friend struct GBRForestInitializeNewTrees;
   
   COND_SERIALIZABLE;
 };
@@ -53,8 +57,8 @@
 //_______________________________________________________________________
 inline double GBRForest::GetResponse(const float* vector) const {
   double response = fInitialResponse;
-  for (std::vector<GBRTree>::const_iterator it=fTrees.begin(); it!=fTrees.end(); ++it) {
-    response += it->GetResponse(vector);
+  for (const auto& tree : fTreesNew){
+    response += tree.GetResponse(vector);
   }
   return response;
 }
@@ -65,18 +69,9 @@ inline double GBRForest::GetGradBoostClassifier(const float* vector) const {
   return 2.0/(1.0+exp(-2.0*response))-1; //MVA output between -1 and 1
 }
 
-struct GBRForestInitializeTreeNodes {
+struct GBRForestInitializeNewTrees {
   void operator()(GBRForest& forest){
-    for(auto& tree : forest.fTrees){
-      tree.Nodes().reserve(tree.CutIndices().size());
-      for(unsigned i = 0; i < tree.CutIndices().size(); ++i){
-        tree.Nodes().emplace_back(tree.CutIndices()[i],tree.CutVals()[i],tree.LeftIndices()[i],tree.RightIndices()[i]);
-      }
-      tree.CutIndices().clear();
-      tree.CutVals().clear();
-      tree.LeftIndices().clear();
-      tree.RightIndices().clear();
-    }
+    forest.initNewTrees();
   }
 };
 

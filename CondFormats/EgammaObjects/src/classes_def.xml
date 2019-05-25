@@ -4,26 +4,20 @@
   <class name="ElectronLikelihoodCalibration"/>
   <class name="ElectronLikelihoodCalibration::Entry"/>
   <class name="std::vector<ElectronLikelihoodCalibration::Entry>"/>     
-  <class name="GBRForest" class_version = "0">
+  <class name="GBRForest" class_version = "4">
     <field name="fTrees" mapping="blob"/>
-  </class>
-  <class name="std::vector<GBRTree>"/>
-  <class name="GBRNode"/>
-  <class name="GBRTree" ClassVersion="4">
-    <version ClassVersion="4" checksum="2174972031"/>
-    <version ClassVersion="3" checksum="2333733795"/>
-    <ioread sourceClass="GBRTree" version="[-3]"
-      source="std::vector<unsigned char> fCutIndices; std::vector<float> fCutVals; std::vector<int> fLeftIndices; std::vector<int> fRightIndices;"
-      targetClass="GBRTree"
-      target="fNodes">
+    <field name="fTreesNew" mapping="blob"/>
+    <ioread sourceClass="GBRForest" version="[-3]" targetClass="GBRForest" source="" target="">
       <![CDATA[
-        fNodes.reserve(onfile.fCutIndices.size());
-        for(unsigned i = 0; i < onfile.fCutIndices.size(); ++i){
-          fNodes.emplace_back(onfile.fCutIndices[i],onfile.fCutVals[i],onfile.fLeftIndices[i],onfile.fRightIndices[i]);
-        }
+        newObj->initNewTrees();
       ]]>
     </ioread>
   </class>
+  <class name="std::vector<GBRTree>"/>
+  <class name="GBRTree"/>
+  <class name="std::vector<GBRTreeNew>"/>
+  <class name="GBRTreeNew"/>
+  <class name="GBRNode"/>
   <class name="GBRForest2D" class_version = "0">
     <field name="fTrees" mapping="blob"/>
   </class>

@@ -12,7 +12,8 @@ int main()
     testSerialization<GBRForest2D>();
     testSerialization<GBRForestD>();
     testSerialization<GBRTree>();
-    testSerialization<GBRTree::GBRNode>();
+    testSerialization<GBRTreeNew>();
+    testSerialization<GBRTreeNew::GBRNode>();
     testSerialization<GBRTree2D>();
     testSerialization<GBRTreeD>();
     testSerialization<std::vector<ElectronLikelihoodCalibration::Entry>>();

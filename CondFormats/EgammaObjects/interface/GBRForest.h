@@ -18,6 +18,7 @@
 
 #include "CondFormats/Serialization/interface/Serializable.h"
 #include "CondFormats/EgammaObjects/interface/GBRTree.h"
+#include "CondFormats/EgammaObjects/interface/GBRTreeNew.h"
 
 #include <vector>
 #include <cmath>
@@ -40,11 +41,15 @@
        std::vector<GBRTree> &Trees() { return fTrees; }
        const std::vector<GBRTree> &Trees() const { return fTrees; }
 
+       void initNewTrees();
+
     protected:
 
        double               fInitialResponse;
-       std::vector<GBRTree> fTrees;  
-      
+       std::vector<GBRTree> fTrees;
+       std::vector<GBRTreeNew> fTreesNew COND_TRANSIENT;
+
+       friend struct GBRForestInitializeNewTrees;
   
   COND_SERIALIZABLE;
 };
@@ -52,8 +57,8 @@
 //_______________________________________________________________________
 inline double GBRForest::GetResponse(const float* vector) const {
   double response = fInitialResponse;
-  for (std::vector<GBRTree>::const_iterator it=fTrees.begin(); it!=fTrees.end(); ++it) {
-    response += it->GetResponse(vector);
+  for (const auto& tree : fTreesNew){
+    response += tree.GetResponse(vector);
   }
   return response;
 }
@@ -63,5 +68,11 @@ inline double GBRForest::GetGradBoostClassifier(const float* vector) const {
   double response = GetResponse(vector);
   return 2.0/(1.0+exp(-2.0*response))-1; //MVA output between -1 and 1
 }
+
+struct GBRForestInitializeNewTrees {
+  void operator()(GBRForest& forest){
+    forest.initNewTrees();
+  }
+};
 
 #endif

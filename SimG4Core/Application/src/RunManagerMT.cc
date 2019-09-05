@@ -70,6 +70,7 @@ RunManagerMT::RunManagerMT(edm::ParameterSet const & p):
       m_PhysicsTablesDir(p.getParameter<std::string>("PhysicsTablesDirectory")),
       m_StorePhysicsTables(p.getParameter<bool>("StorePhysicsTables")),
       m_RestorePhysicsTables(p.getParameter<bool>("RestorePhysicsTables")),
+      m_UseParametrisedEMPhysics(p.getUntrackedParameter<bool>("UseParametrisedEMPhysics")),
       m_pField(p.getParameter<edm::ParameterSet>("MagneticField")),
       m_pPhysics(p.getParameter<edm::ParameterSet>("Physics")),
       m_pRunAction(p.getParameter<edm::ParameterSet>("RunAction")),
@@ -162,7 +163,8 @@ void RunManagerMT::initG4(const DDCompactView *pDD, const MagneticField *pMF,
 
   // adding GFlash, Russian Roulette for eletrons and gamma, 
   // step limiters on top of any Physics Lists
-  phys->RegisterPhysics(new ParametrisedEMPhysics("EMoptions",m_pPhysics));
+  if (m_UseParametrisedEMPhysics)
+    phys->RegisterPhysics(new ParametrisedEMPhysics("EMoptions",m_pPhysics));
 
   m_physicsList->ResetStoredInAscii();
   if (m_RestorePhysicsTables) {

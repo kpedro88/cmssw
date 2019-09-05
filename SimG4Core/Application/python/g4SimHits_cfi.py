@@ -51,6 +51,7 @@ g4SimHits = cms.EDProducer("OscarMTProducer",
     PhysicsTablesDirectory = cms.string('PhysicsTables'),
     StorePhysicsTables = cms.bool(False),
     RestorePhysicsTables = cms.bool(False),
+    UseParametrisedEMPhysics = cms.untracked.bool(False),
     CheckOverlap = cms.untracked.bool(False),
     G4CheckOverlap = cms.PSet(
         Tolerance = cms.untracked.double(0.0),

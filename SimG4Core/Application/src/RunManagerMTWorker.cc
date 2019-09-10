@@ -97,6 +97,7 @@ namespace {
       std::shared_ptr<SimProducer> producerTemp;
       maker->make(watcher,iReg,watcherTemp,producerTemp);
       oWatchers.push_back(watcherTemp);
+      edm::LogError("SimG4CoreApplication") << "createWatchers:: thread " << thisThreadID << ", watcher " << watcherTemp.get() << ", registry " << &iReg;
       if(producerTemp) {
         oProds.push_back(producerTemp);
       }
@@ -120,6 +121,7 @@ struct RunManagerMTWorker::TLSData {
   G4RunManagerKernel* kernel = nullptr;
   bool threadInitialized = false;
   bool runTerminated = false;
+  int threadID = -1;
 };
 
 thread_local RunManagerMTWorker::TLSData *RunManagerMTWorker::m_tls = nullptr;
@@ -164,6 +166,7 @@ void RunManagerMTWorker::initializeTLS() {
   //Look for an outside SimActivityRegistry
   // this is used by the visualization code
   int thisID = getThreadIndex();
+  m_tls->threadID = thisID;
   if(otherRegistry){
     m_tls->registry.connect(*otherRegistry);
     if(thisID > 0) {
@@ -181,7 +184,7 @@ void RunManagerMTWorker::initializeThread(RunManagerMT& runManagerMaster, const 
 
   int thisID = getThreadIndex();
 
-  edm::LogInfo("SimG4CoreApplication")
+  edm::LogError("SimG4CoreApplication")
     << "RunManagerMTWorker::initializeThread " << thisID;
 
   // Initialize per-thread output
@@ -370,6 +373,11 @@ std::vector<SensitiveCaloDetector*>& RunManagerMTWorker::sensCaloDetectors() {
 std::vector<std::shared_ptr<SimProducer> > RunManagerMTWorker::producers() {
   initializeTLS();
   return m_tls->producers;
+}
+
+int RunManagerMTWorker::threadID() {
+  initializeTLS();
+  return m_tls->threadID;
 }
 
 void RunManagerMTWorker::initializeRun() {

@@ -3,6 +3,7 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 
 #include "SimG4Core/Application/interface/OscarMTProducer.h"
 #include "SimG4Core/Application/interface/RunManagerMT.h"
@@ -224,9 +225,10 @@ void OscarMTProducer::produce(edm::Event & e, const edm::EventSetup & es)
   }
 
   for(auto & prod :  m_producers) {
+    edm::LogError("SimG4CoreApplication") << "produce:: thread " << m_runManagerWorker->threadID() << ", watcher " << prod.get();
     prod.get()->produce(e,es);
   }
-  LogDebug("SimG4CoreApplication") 
+  edm::LogError("SimG4CoreApplication") 
     << "Event is produced " << e.id() << " stream " << e.streamID() 
     << " rand= " << G4UniformRand();
 }

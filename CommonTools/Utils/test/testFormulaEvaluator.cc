@@ -704,7 +704,7 @@ testFormulaEvaluator::checkFormulaEvaluator() {
     std::vector<double> emptyV;
 
     CPPUNIT_ASSERT(f.evaluate(emptyV, emptyV) == TMath::ATan2(-0.5, 0.5));
-  }  
+  }
 
   {
     reco::FormulaEvaluator f("cosh(0.5)");

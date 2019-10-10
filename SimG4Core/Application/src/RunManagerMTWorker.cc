@@ -39,6 +39,8 @@
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
 
+#include "SimGVCore/CaloG4/interface/CMSGridField.h"
+
 #include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
 
 #include "SimG4Core/Physics/interface/PhysicsList.h"
@@ -227,17 +229,22 @@ void RunManagerMTWorker::initializeThread(RunManagerMT& runManagerMaster, const 
   // setup the magnetic field
   if (m_pUseMagneticField)
     {
-      const GlobalPoint g(0.,0.,0.);
-
       edm::ESHandle<MagneticField> pMF;
       es.get<IdealMagneticFieldRecord>().get(pMF);
 
-      sim::FieldBuilder fieldBuilder(pMF.product(), m_pField);
-      CMSFieldManager* fieldManager = new CMSFieldManager();
-      G4TransportationManager * tM =
-	G4TransportationManager::GetTransportationManager();
-      tM->SetFieldManager(fieldManager);
-      fieldBuilder.build( fieldManager, tM->GetPropagatorInField());
+      if(m_pField.getParameter<bool>("UseGrid")){
+        auto fieldMgr = G4TransportationManager::GetTransportationManager()->GetFieldManager();
+        auto magField = new CMSGridField(pMF.product(), m_pField.getParameter<edm::ParameterSet>("Grid"));
+        fieldMgr->SetDetectorField(magField);
+        fieldMgr->CreateChordFinder(magField);
+      }
+      else {
+        sim::FieldBuilder fieldBuilder(pMF.product(), m_pField);
+        CMSFieldManager* fieldManager = new CMSFieldManager();
+        G4TransportationManager* tM = G4TransportationManager::GetTransportationManager();
+        tM->SetFieldManager(fieldManager);
+        fieldBuilder.build(fieldManager, tM->GetPropagatorInField());
+      }
     }
 
   // attach sensitive detector

@@ -80,6 +80,8 @@ g4SimHits = cms.EDProducer("OscarMTProducer",
     ),
     MagneticField = cms.PSet(
         UseLocalMagFieldManager = cms.bool(False),
+        UseGrid = cms.bool(False),
+        Grid = cms.PSet(),
         Verbosity = cms.untracked.bool(False),
         ConfGlobalMFM = cms.PSet(
             Volume = cms.string('OCMS'),

@@ -122,8 +122,8 @@ void FastTrackDeDxProducer::fillDescriptions(edm::ConfigurationDescriptions& des
   desc.add<edm::InputTag>("tracks",edm::InputTag("generalTracks"));
   desc.add<bool>("UsePixel",false); 
   desc.add<bool>("UseStrip",true); 
-  desc.add<double>("MeVperADCPixel",3.61e-06*265);
-  desc.add<double>("MeVperADCStrip",3.61e-06);
+  desc.add<double>("MeVperADCStrip",3.61e-06*265);
+  desc.add<double>("MeVperADCPixel",3.61e-06);
   desc.add<bool>("ShapeTest",true);      
   desc.add<bool>("UseCalibration",false);  
   desc.add<string>("calibrationPath", "");
@@ -207,10 +207,8 @@ void FastTrackDeDxProducer::produce(edm::Event& iEvent, const edm::EventSetup& i
   std::vector<DeDxData> dedxEstimate( trackCollection.size() );
 
 
-
   for(unsigned int j=0;j<trackCollection.size();j++){            
     const reco::TrackRef track = reco::TrackRef( trackCollectionHandle.product(), j );
-    
     int NClusterSaturating = 0; 
     DeDxHitCollection dedxHits;
       
@@ -248,8 +246,12 @@ void FastTrackDeDxProducer::produce(edm::Event& iEvent, const edm::EventSetup& i
 
 void FastTrackDeDxProducer::processHit(const FastTrackerRecHit &recHit, float trackMomentum, float& cosine, reco::DeDxHitCollection& dedxHits, int& NClusterSaturating){
 
+  if(!recHit.isValid()) return;
 
-  if(!recHit.isValid())return;
+  auto const& thit = static_cast<BaseTrackerRecHit const&>(recHit);
+  if (!thit.isValid()) return;
+
+    if (!thit.hasPositionAndError()) return;
 
   if(recHit.isPixel()){
     if(!usePixel) return;
@@ -259,10 +261,12 @@ void FastTrackDeDxProducer::processHit(const FastTrackerRecHit &recHit, float tr
     if (nothick) pathLen = 1.0;
     float charge = recHit.energyLoss()/pathLen;
     if (convertFromGeV2MeV) charge*=1000;
+
     dedxHits.push_back( DeDxHit( charge, trackMomentum, pathLen, recHit.geographicalId()) );
   }
   else if(!recHit.isPixel()){// && !recHit.isMatched()){//check what recHit.isMatched is doing
     if(!useStrip) return;
+    
     auto& detUnit     = *(recHit.detUnit());
     float pathLen     = detUnit.surface().bounds().thickness()/fabs(cosine);
     if (nothick) pathLen = 1.0;

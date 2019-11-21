@@ -185,17 +185,6 @@ phase2_hgcal.toModify(
 #                  useKDTree  = cms.bool(False) )
 #)
 
-
-from Configuration.Eras.Modifier_phase2_timing_cff import phase2_timing
-_addTiming = particleFlowBlock.elementImporters.copy()
-_addTiming.append( cms.PSet( importerName = cms.string("TrackTimingImporter"),
-                             timeValueMap = cms.InputTag("trackTimeValueMapProducer:generalTracksConfigurableFlatResolutionModel"),
-                             timeErrorMap = cms.InputTag("trackTimeValueMapProducer:generalTracksConfigurableFlatResolutionModelResolution"),
-                             timeValueMapGsf = cms.InputTag("gsfTrackTimeValueMapProducer:electronGsfTracksConfigurableFlatResolutionModel"),
-                             timeErrorMapGsf = cms.InputTag("gsfTrackTimeValueMapProducer:electronGsfTracksConfigurableFlatResolutionModelResolution")
-                             ) 
-                   )
-
 from Configuration.Eras.Modifier_phase2_timing_layer_cff import phase2_timing_layer
 _addTimingLayer = particleFlowBlock.elementImporters.copy()
 _addTimingLayer.append( cms.PSet( importerName = cms.string("TrackTimingImporter"),
@@ -208,11 +197,6 @@ _addTimingLayer.append( cms.PSet( importerName = cms.string("TrackTimingImporter
                              timeErrorMapGsf = cms.InputTag("tofPID:sigmat0")
                              ) 
                    )
-
-phase2_timing.toModify(
-    particleFlowBlock,
-    elementImporters = _addTiming
-)
 
 phase2_timing_layer.toModify(
     particleFlowBlock,

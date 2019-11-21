@@ -4,8 +4,8 @@ from RecoVertex.Configuration.RecoVertex_cff import unsortedOfflinePrimaryVertic
 from RecoVertex.PrimaryVertexProducer.TkClusParameters_cff import DA2D_vectParameters
 
 unsortedOfflinePrimaryVertices4D = unsortedOfflinePrimaryVertices.clone(TkClusParameters = DA2D_vectParameters,
-                                                                        TrackTimesLabel = cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModel"),
-                                                                        TrackTimeResosLabel = cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModelResolution"),
+                                                                        TrackTimesLabel = cms.InputTag("tofPID:t0safe"),
+                                                                        TrackTimeResosLabel = cms.InputTag("tofPID:sigmat0safe"),
                                                                         )
 trackWithVertexRefSelectorBeforeSorting4D = trackWithVertexRefSelector.clone(vertexTag="unsortedOfflinePrimaryVertices4D",
                                                                                     ptMax=9e99,
@@ -13,8 +13,8 @@ trackWithVertexRefSelectorBeforeSorting4D = trackWithVertexRefSelector.clone(ver
 trackRefsForJetsBeforeSorting4D = trackRefsForJets.clone(src="trackWithVertexRefSelectorBeforeSorting4D")
 offlinePrimaryVertices4D=sortedPrimaryVertices.clone(vertices="unsortedOfflinePrimaryVertices4D",
                                                             particles="trackRefsForJetsBeforeSorting4D",
-                                                            trackTimeTag=cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModel"),
-                                                            trackTimeResoTag=cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModelResolution"),
+                                                            trackTimeTag=cms.InputTag("tofPID:t0safe"),
+                                                            trackTimeResoTag=cms.InputTag("tofPID:sigmat0safe"),
                                                             assignment=dict(useTiming=True))
 offlinePrimaryVertices4DWithBS=offlinePrimaryVertices4D.clone(vertices="unsortedOfflinePrimaryVertices4D:WithBS")
 
@@ -31,20 +31,6 @@ offlinePrimaryVertices4DnoPID=offlinePrimaryVertices4D.clone(vertices="unsortedO
                                                           trackTimeResoTag="trackExtenderWithMTD:generalTracksigmat0")
 offlinePrimaryVertices4DnoPIDWithBS=offlinePrimaryVertices4DnoPID.clone(vertices="unsortedOfflinePrimaryVertices4DnoPID:WithBS")
 
-unsortedOfflinePrimaryVertices4DwithPID = unsortedOfflinePrimaryVertices4D.clone(TrackTimesLabel = "tofPID:t0safe",
-                                                                                 TrackTimeResosLabel = "tofPID:sigmat0safe",
-                                                                                 )
-trackWithVertexRefSelectorBeforeSorting4DwithPID = trackWithVertexRefSelector.clone(vertexTag="unsortedOfflinePrimaryVertices4DwithPID",
-                                                                             ptMax=9e99,
-                                                                             ptErrorCut=9e99)
-trackRefsForJetsBeforeSorting4DwithPID = trackRefsForJets.clone(src="trackWithVertexRefSelectorBeforeSorting4DwithPID")
-offlinePrimaryVertices4DwithPID=offlinePrimaryVertices4D.clone(vertices="unsortedOfflinePrimaryVertices4DwithPID",
-                                                     particles="trackRefsForJetsBeforeSorting4DwithPID",
-                                                     trackTimeTag="tofPID:t0safe",
-                                                     trackTimeResoTag="tofPID:sigmat0safe")
-offlinePrimaryVertices4DwithPIDWithBS=offlinePrimaryVertices4DwithPID.clone(vertices="unsortedOfflinePrimaryVertices4DwithPID:WithBS")
-
 from SimTracker.TrackerHitAssociation.tpClusterProducer_cfi import tpClusterProducer
 from SimTracker.TrackAssociatorProducers.quickTrackAssociatorByHits_cfi import quickTrackAssociatorByHits
-from SimTracker.TrackAssociation.trackTimeValueMapProducer_cfi import trackTimeValueMapProducer
 from CommonTools.RecoAlgos.tofPID_cfi import tofPID

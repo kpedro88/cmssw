@@ -18,10 +18,11 @@ using namespace std;                          // Help ADL of std functions.
 using namespace boost::math::tools;           // For bracket_and_solve_root.
 
  // constructor
- Suep_shower::Suep_shower(double mass, double temperature, double energy) {
+ Suep_shower::Suep_shower(double mass, double temperature, double energy, Pythia8::Rndm* rndmPtr) {
         m = mass;
         Temp=temperature;
         Etot=energy;
+        fRndmPtr=rndmPtr;
      
         A=m/Temp;
         p_m=sqrt(2/(A*A)*(1+sqrt(1+A*A)));
@@ -66,8 +67,8 @@ vector<double> Suep_shower::generate_fourvector(){
     double U, V, X, Y, E;
     int i=0;      
     while(i<100){
-        U = ((double) rand() / RAND_MAX);
-        V = ((double) rand() / RAND_MAX);
+        U = fRndmPtr->flat();
+        V = fRndmPtr->flat();
         
         if(U < q_m){
             Y=U/q_m;
@@ -95,8 +96,8 @@ vector<double> Suep_shower::generate_fourvector(){
     p=X*(this->m); // X is the dimensionless momentum, p/m
     
     // now do the angles
-    phi = 2.0*M_PI*((double) rand() / RAND_MAX);
-    theta = acos(2.0*((double) rand() / RAND_MAX)-1.0);
+    phi = 2.0*M_PI*(fRndmPtr->flat());
+    theta = acos(2.0*(fRndmPtr->flat())-1.0);
     
     // compose the 4 vector
     en = sqrt(p*p+(this->m)*(this->m));

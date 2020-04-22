@@ -5,6 +5,8 @@
 #include <vector>
 #include <utility>
 
+#include "Pythia8/Pythia.h"
+
 class tolerance {
 public:
 	tolerance(double eps) :
@@ -27,7 +29,7 @@ class Suep_shower
     double Etot; 
     
     // Constructor
-    Suep_shower(double mass, double temperature, double energy);
+    Suep_shower(double mass, double temperature, double energy, Pythia8::Rndm* rndmPtr);
     
     // methods
     double f(double p);
@@ -45,7 +47,7 @@ class Suep_shower
     double p_plus, p_minus;
     double lambda_plus,lambda_minus;
     double q_plus, q_minus, q_m;
-            
+    Pythia8::Rndm* fRndmPtr;
 }; 
 
 #endif

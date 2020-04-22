@@ -16,7 +16,7 @@ bool SuepHook::initAfterBeams() {
   }
 
   //construct the shower helper
-  suep_shower_ = std::make_unique<Suep_shower>(mDark_, temperature_, mMediator_);
+  suep_shower_ = std::make_unique<Suep_shower>(mDark_, temperature_, mMediator_, rndmPtr);
 
   return true;
 }

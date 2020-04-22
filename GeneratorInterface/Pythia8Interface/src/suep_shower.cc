@@ -7,10 +7,8 @@
  
 // Written by Simon Knapen on 12/22/2019
 
-
 //following 1305.5226
-#include <iostream>
-#include <math.h>
+#include <cmath>
 #include <boost/math/tools/roots.hpp>
 #include <boost/bind.hpp>
 
@@ -18,7 +16,6 @@
 
 using namespace std;                          // Help ADL of std functions.
 using namespace boost::math::tools;           // For bracket_and_solve_root.
-
 
  // constructor
  Suep_shower::Suep_shower(double mass, double temperature, double energy) {
@@ -43,7 +40,6 @@ using namespace boost::math::tools;           // For bracket_and_solve_root.
         q_m = 1- (q_plus + q_minus);
     
     }
-
 
 // maxwell-boltzman distribution, slightly massaged
 double  Suep_shower::f(double p){
@@ -115,7 +111,7 @@ vector<double> Suep_shower::generate_fourvector(){
 // auxiliary function which computes the total energy difference as a function of the momentum vectors and a scale factor "a"
 // to ballance energy, we solve for "a" by demanding that this function vanishes
 // By rescaling the momentum rather than the energy, I avoid having to do these annoying rotations from the previous version 
-double Suep_shower::reballance_func(double a, vector< vector <double> > event){
+double Suep_shower::reballance_func(double a, const vector< vector <double> >& event){
     double result =0.0;
     double p2;
     for(unsigned n = 0; n<event.size();n++){

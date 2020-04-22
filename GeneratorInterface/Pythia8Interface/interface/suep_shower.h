@@ -2,11 +2,8 @@
 #ifndef SUEPSHOWER_h
 #define SUEPSHOWER_h
 
-#include <iostream>
-#include <math.h>
-#include <boost/math/tools/roots.hpp>
-#include <boost/bind.hpp>
-
+#include <vector>
+#include <utility>
 
 class tolerance {
 public:
@@ -19,8 +16,6 @@ public:
 private:
 	double _eps;
 };
-
-
 
 class Suep_shower 
 { 
@@ -40,7 +35,7 @@ class Suep_shower
     double test_fun(double p);
     std::vector<double> generate_fourvector(); 
     std::vector< std::vector <double> > generate_shower();
-    double reballance_func(double a, std::vector< std::vector <double> > event);
+    double reballance_func(double a, const std::vector< std::vector <double> >& event);
         
     private:
     // private variables
@@ -53,11 +48,4 @@ class Suep_shower
             
 }; 
 
- 
-
 #endif
-
-
-
-
-

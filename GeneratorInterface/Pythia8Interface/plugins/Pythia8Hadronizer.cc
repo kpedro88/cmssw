@@ -43,6 +43,9 @@ using namespace Pythia8;
 //decay filter hook
 #include "GeneratorInterface/Pythia8Interface/interface/PTFilterHook.h"
 
+//other hooks
+#include "GeneratorInterface/Pythia8Interface/plugins/SuepHook.h"
+
 // EvtGen plugin
 //
 #include "Pythia8Plugins/EvtGen.h"
@@ -145,6 +148,9 @@ class Pythia8Hadronizer : public Py8InterfaceBase {
  
     //PT filter hook
     std::auto_ptr<PTFilterHook> fPTFilterHook;
+
+    //other hooks
+    std::auto_ptr<SuepHook> fSuepHook;
    
     int  EV1_nFinal;
     bool EV1_vetoOn;
@@ -320,6 +326,11 @@ Pythia8Hadronizer::Pythia8Hadronizer(const edm::ParameterSet &params) :
                                EV1_emittedMode, EV1_pTdefMode, 
 			       EV1_MPIvetoOn, EV1_QEDvetoMode, EV1_nFinalMode, 0));
   }
+
+  if ( params.exists("suep") )
+  {
+    fSuepHook.reset(new SuepHook(params.getParameter<edm::ParameterSet>("suep")));
+  }
   
   if( params.exists( "VinciaPlugin" ) ) {
     fMasterGen.reset(new Pythia);
@@ -385,6 +396,7 @@ bool Pythia8Hadronizer::initializeForInternalPartons()
     edm::LogInfo("Pythia8Interface") << "Turning on Emission Veto Hook 1 from CMSSW Pythia8Interface";
     fMultiUserHook->addHook(fEmissionVetoHook1.get());
   }
+  if(fSuepHook.get()) fMultiUserHook->addHook(fSuepHook.get());
   
   if (fMasterGen->settings.mode("POWHEG:veto") > 0 || fMasterGen->settings.mode("POWHEG:MPIveto") > 0) {
 

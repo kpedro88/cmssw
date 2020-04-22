@@ -54,5 +54,6 @@ bool SuepHook::doVetoProcessLevel(Pythia8::Event& event) {
         }
     }
 
-  return true;
+  //allow event to continue
+  return false;
 }

@@ -10,8 +10,8 @@ bool SuepHook::initAfterBeams() {
   mMediator_ = particleDataPtr->m0(idMediator_);
   mDark_ = particleDataPtr->m0(idDark_);
   bool medDecay = particleDataPtr->mayDecay(idMediator_);
-  if(medDecay){
-    infoPtr->errorMsg("Error in SuepHook::initAfterBeams: mediator decay should be disabled");
+  if(!medDecay){
+    infoPtr->errorMsg("Error in SuepHook::initAfterBeams: mediator decay should be enabled");
     return false;
   }
 
@@ -32,7 +32,10 @@ bool SuepHook::doVetoProcessLevel(Pythia8::Event& event) {
     for (int i = 0; i < event.size(); ++i){ 
         if (event[i].id()==idMediator_ && event[i].isFinal()) {
           pMediator = event[i].p();
-          
+
+          // undo mediator decay
+          event[i].undoDecay();
+
           // Loop over hidden sector mesons and append to the event
           for (const auto& vDark : suep_shower4momenta){
             //construct pythia 4vector

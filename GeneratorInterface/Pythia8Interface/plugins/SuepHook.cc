@@ -29,14 +29,16 @@ bool SuepHook::doVetoProcessLevel(Pythia8::Event& event) {
     const auto& suep_shower4momenta = suep_shower_->generate_shower();
 
     // Find the mediator in the event
-    for (int i = 0; i < event.size(); ++i){ 
-        if (event[i].id()==idMediator_ && event[i].isFinal()) {
+    for (int i = 0; i < event.size(); ++i){
+        //mediator w/ distinct daughters = last copy (decayed)
+        if (event[i].id()==idMediator_ && event[i].daughter1()!=event[i].daughter2() && event[i].daughter1()>0 && event[i].daughter2()>0) {
           pMediator = event[i].p();
 
           // undo mediator decay
           event[i].undoDecay();
 
           // Loop over hidden sector mesons and append to the event
+          int firstDaughter = event.size();
           for (const auto& vDark : suep_shower4momenta){
             //construct pythia 4vector
             pDark.p(vDark[1],vDark[2],vDark[3],vDark[0]);
@@ -51,8 +53,8 @@ bool SuepHook::doVetoProcessLevel(Pythia8::Event& event) {
           // Change the status code of the mediator to reflect that it has decayed.
           event[i].statusNeg();
           
-          //set daughters of the mediator (Not all mesons are recognized as daughters, hopefully doesn't result in issues.)
-          event[i].daughters(event.size()-2, event.size()-1); 
+          //set daughters of the mediator: daughter1 < daughter2 > 0 -> the particle has a range of decay products from daughter1 to daughter2
+          event[i].daughters(firstDaughter, event.size()-1);
           break;
         }
     }

@@ -59,6 +59,10 @@ class TritonClient : public Client {
 		//helper for common ops
 		std::exception_ptr setup();
 
+		//helper to turn triton error into exception
+		template <typename F, typename... Args>
+		static std::exception_ptr wrap(F&& fn, const std::string& msg, Args&&... args);
+
 		void reportServerSideState(const ServerSideStats& stats) const;
 		void summarizeServerStats(
 			const ModelInfo model_info,

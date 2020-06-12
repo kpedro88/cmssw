@@ -7,6 +7,7 @@
 #include <string>
 #include <chrono>
 #include <exception>
+#include <utility>
 
 namespace nic = nvidia::inferenceserver::client;
 namespace ni = nvidia::inferenceserver;
@@ -26,16 +27,28 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 }
 
 template <typename Client>
-std::exception_ptr TritonClient<Client>::setup() {
-	auto err = nic::InferGrpcContext::Create(&context_, url_, modelName_, -1, false);
-	if (!err.IsOk()) {
+template <typename F, typename... Args>
+std::exception_ptr TritonClient<Client>::wrap(F&& fn, const std::string& msg, Args&&... args) {
+	auto err = fn(std::forward<Args>(args)...);
+	if (!err.IsOk()){
 		cms::Exception ex("TritonServerFailure");
-		ex << "setup(): unable to create inference context: " << err;
+		ex << msg << ": " << err;
 		return make_exception_ptr(ex);
 	}
+	return std::exception_ptr{};
+}
+
+
+template <typename Client>
+std::exception_ptr TritonClient<Client>::setup() {
+	std::exception_ptr exptr{};
+
+	exptr = wrap(nic::InferGrpcContext::Create, "setup(): unable to create inference context", &context_, url_, modelName_, -1, false);
+	if(exptr) return exptr;
 
 	std::unique_ptr<nic::InferContext::Options> options;
-	auto err0 = nic::InferContext::Options::Create(&options);
+	exptr = wrap(nic::InferContext::Options::Create, "setup(): unable to create inference context options", &options);
+	if(exptr) return exptr;
 
 	options->SetBatchSize(batchSize_);
 	for (const auto& output : context_->Outputs()) {

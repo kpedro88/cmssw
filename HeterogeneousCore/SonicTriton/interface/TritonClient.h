@@ -13,20 +13,17 @@
 
 #include "request_grpc.h"
 
-namespace nic = nvidia::inferenceserver::client;
 namespace ni = nvidia::inferenceserver;
+namespace nic = ni::client;
 
 template <typename Client>
 class TritonClient : public Client {
 	public:
-		typedef ModelInfo = std::pair<std::string, int64_t>;
 		struct ServerSideStats {
-			uint64_t requestCount_;
-			uint64_t cummTimeNs_;
-			uint64_t queueTimeNs_;
-			uint64_t computeTimeNs_;
-
-			std::map<ModelInfo, ServerSideStats> composingModelsStat_;
+			uint64_t request_count_;
+			uint64_t cumul_time_ns_;
+			uint64_t queue_time_ns_;
+			uint64_t compute_time_ns_;
 		};
 
 		//constructor
@@ -50,6 +47,7 @@ class TritonClient : public Client {
 			descClient.add<unsigned>("port");
 			descClient.add<unsigned>("timeout");
 			descClient.add<std::string>("modelName");
+			descClient.add<int>("modelVersion",-1);
 			iDesc.add<edm::ParameterSetDescription>("Client",descClient);
 		}
 
@@ -60,37 +58,26 @@ class TritonClient : public Client {
 		std::exception_ptr setup();
 
 		//helper to turn triton error into exception
-		template <typename F, typename... Args>
-		static std::exception_ptr wrap(F&& fn, const std::string& msg, Args&&... args);
+		std::exception_ptr wrap(const nic::Error& err, const std::string& msg) const;
 
-		void reportServerSideState(const ServerSideStats& stats) const;
-		void summarizeServerStats(
-			const ModelInfo model_info,
-			const std::map<std::string, ni::ModelStatus>& start_status,
-			const std::map<std::string, ni::ModelStatus>& end_status,
-			ServerSideStats* server_stats) const;
-		void summarizeServerModelStats(
-			const std::string& model_name, const int64_t model_version,
-			const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-			ServerSideStats* server_stats) const;
+		void reportServerSideStats(const ServerSideStats& stats) const;
+		ServerSideStats summarizeServerStats(
+			const ni::ModelStatus& start_status,
+			const ni::ModelStatus& end_status) const;
 
-		void getServerSideStatus(std::map<std::string, ni::ModelStatus>* model_status);
-		void getServerSideStatus(
-			ni::ServerStatus& server_status, const ModelInfo model_info,
-			std::map<std::string, ni::ModelStatus>* model_status);
+		ni::ModelStatus getServerSideStatus() const;
 
 		//members
 		std::string url_;
 		unsigned timeout_;
 		std::string modelName_;
+		int modelVersion_;
 		unsigned batchSize_;
 		unsigned nInput_;
 		unsigned nOutput_;
 		std::unique_ptr<nic::InferContext> context_;
 		std::unique_ptr<nic::ServerStatusContext> serverCtx_;
 		std::shared_ptr<nic::InferContext::Input> nicInput_; 
-
-		std::map<std::string, ni::ModelStatus> startStatus_, endStatus_;
 };
 
 typedef TritonClient<SonicClientSync<std::vector<float>>> TritonClientSync;

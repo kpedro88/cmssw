@@ -23,7 +23,8 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 	modelVersion_(params.getParameter<int>("modelVersion")),
 	batchSize_(params.getParameter<unsigned>("batchSize")),
 	nInput_(params.getParameter<unsigned>("nInput")),
-	nOutput_(params.getParameter<unsigned>("nOutput"))
+	nOutput_(params.getParameter<unsigned>("nOutput")),
+	verbose_(params.getParameter<bool>("verbose"))
 {
 }
 
@@ -106,6 +107,9 @@ void TritonClient<Client>::evaluate(){
 		return;
 	}
 
+	// Get the status of the server prior to the request being made.
+	const auto& start_status = getServerSideStatus();
+
 	//blocking call
 	auto t1 = std::chrono::high_resolution_clock::now();
 	std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
@@ -118,6 +122,14 @@ void TritonClient<Client>::evaluate(){
 
 	auto t2 = std::chrono::high_resolution_clock::now();
 	edm::LogInfo("TritonClient") << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+
+	const auto& end_status = this->getServerSideStatus();
+
+	if(this->verbose()){
+		const auto& stats = this->summarizeServerStats(start_status, end_status);
+		this->reportServerSideStats(stats);
+	}
+
 	exptr = getResults(results.begin()->second);
 
 	this->finish(exptr==nullptr,exptr);
@@ -154,8 +166,10 @@ void TritonClientAsync::evaluate(){
 
 			const auto& end_status = this->getServerSideStatus();
 
-			const auto& stats = this->summarizeServerStats(start_status, end_status);
-			this->reportServerSideStats(stats);
+			if(this->verbose()){
+				const auto& stats = this->summarizeServerStats(start_status, end_status);
+				this->reportServerSideStats(stats);
+			}
 
 			//check result
 			exptr = this->getResults(results.begin()->second);

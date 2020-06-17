@@ -36,6 +36,7 @@ class TritonClient : public Client {
 		unsigned nInput() const { return nInput_; }
 		unsigned nOutput() const { return nOutput_; }
 		unsigned batchSize() const { return batchSize_; }
+		bool verbose() const { return verbose_; }
 
 		//for fillDescriptions
 		static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {
@@ -48,6 +49,7 @@ class TritonClient : public Client {
 			descClient.add<unsigned>("timeout");
 			descClient.add<std::string>("modelName");
 			descClient.add<int>("modelVersion",-1);
+			descClient.add<bool>("verbose",false);
 			iDesc.add<edm::ParameterSetDescription>("Client",descClient);
 		}
 
@@ -75,6 +77,7 @@ class TritonClient : public Client {
 		unsigned batchSize_;
 		unsigned nInput_;
 		unsigned nOutput_;
+		bool verbose_;
 		std::unique_ptr<nic::InferContext> context_;
 		std::unique_ptr<nic::ServerStatusContext> serverCtx_;
 		std::shared_ptr<nic::InferContext::Input> nicInput_; 

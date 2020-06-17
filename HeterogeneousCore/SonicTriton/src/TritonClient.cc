@@ -8,6 +8,7 @@
 #include <cmath>
 #include <chrono>
 #include <exception>
+#include <sstream>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -228,31 +229,32 @@ void TritonClientAsync::evaluate(){
 }
 
 template <typename Client>
-void TritonClient<Client>::reportServerSideStats(const typename TritonClient<Client>::ServerSideStats& stats) const
-{
+void TritonClient<Client>::reportServerSideStats(const typename TritonClient<Client>::ServerSideStats& stats) const {
+	std::stringstream msg;
+
 	// https://github.com/NVIDIA/tensorrt-inference-server/blob/v1.12.0/src/clients/c++/perf_client/inference_profiler.cc
 	const uint64_t count = stats.request_count_;
-	if (count == 0)
-	{
-		edm::LogInfo("TritonClient") << "  Request count: " << count;
-		return;
+	msg << "  Request count: " << count;
+
+	if (count > 0) {
+		auto get_avg_us = [count](uint64_t tval){
+			constexpr uint64_t us_to_ns = 1000;
+			return tval / us_to_ns / count;
+		};
+
+		const uint64_t cumul_avg_us = get_avg_us(stats.cumul_time_ns_);
+		const uint64_t queue_avg_us = get_avg_us(stats.queue_time_ns_);
+		const uint64_t compute_avg_us = get_avg_us(stats.compute_time_ns_);
+		const uint64_t overhead = (cumul_avg_us > queue_avg_us + compute_avg_us) ? (cumul_avg_us - queue_avg_us - compute_avg_us) : 0;
+
+		msg << "\n"
+			<< "  Avg request latency: " << cumul_avg_us << " usec" << "\n"
+			<< "  (overhead " << overhead << " usec + "
+			<< "queue " << queue_avg_us << " usec + "
+			<< "compute " << compute_avg_us << " usec)" << std::endl;
 	}
 
-	const uint64_t cumul_time_us = stats.cumul_time_ns_ / 1000;
-	const uint64_t cumul_avg_us = cumul_time_us / count;
-
-	const uint64_t queue_time_us = stats.queue_time_ns_ / 1000;
-	const uint64_t queue_avg_us = queue_time_us / count;
-
-	const uint64_t compute_time_us = stats.compute_time_ns_ / 1000;
-	const uint64_t compute_avg_us = compute_time_us / count;
-
-	const uint64_t overhead = (cumul_avg_us > queue_avg_us + compute_avg_us) ? (cumul_avg_us - queue_avg_us - compute_avg_us) : 0;
-	edm::LogInfo("TritonClient") << "  Request count: " << count << "\n"
-				<< "  Avg request latency: " << cumul_avg_us << " usec" << "\n"
-				<< " (overhead " << overhead << " usec + "
-				<< "queue " << queue_avg_us << " usec + "
-				<< "compute " << compute_avg_us << " usec)" << std::endl;
+	edm::LogInfo("TritonClient") << msg.str();
 }
 
 template <typename Client>

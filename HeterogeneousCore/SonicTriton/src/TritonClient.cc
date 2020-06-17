@@ -30,7 +30,6 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 {
 }
 
-//todo: add "severity" option to emit LogWarning instead of exception
 template <typename Client>
 std::exception_ptr TritonClient<Client>::wrap(const nic::Error& err, const std::string& msg, Severity sev) const {
 	std::exception_ptr eptr;

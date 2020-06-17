@@ -19,6 +19,12 @@ namespace nic = ni::client;
 template <typename Client>
 class TritonClient : public Client {
 	public:
+		enum class Severity {
+			None = 0,
+			Low = 1,
+			High = 2,
+		};
+
 		struct ServerSideStats {
 			uint64_t request_count_;
 			uint64_t cumul_time_ns_;
@@ -50,6 +56,7 @@ class TritonClient : public Client {
 			descClient.add<std::string>("modelName");
 			descClient.add<int>("modelVersion",-1);
 			descClient.add<bool>("verbose",false);
+			descClient.add<int>("minSeverityExit",0);
 			iDesc.add<edm::ParameterSetDescription>("Client",descClient);
 		}
 
@@ -60,7 +67,7 @@ class TritonClient : public Client {
 		std::exception_ptr setup();
 
 		//helper to turn triton error into exception
-		std::exception_ptr wrap(const nic::Error& err, const std::string& msg) const;
+		std::exception_ptr wrap(const nic::Error& err, const std::string& msg, Severity sev) const;
 
 		void reportServerSideStats(const ServerSideStats& stats) const;
 		ServerSideStats summarizeServerStats(
@@ -78,6 +85,7 @@ class TritonClient : public Client {
 		unsigned nInput_;
 		unsigned nOutput_;
 		bool verbose_;
+		Severity minSeverityExit_;
 		std::unique_ptr<nic::InferContext> context_;
 		std::unique_ptr<nic::ServerStatusContext> serverCtx_;
 		std::shared_ptr<nic::InferContext::Input> nicInput_; 

@@ -24,38 +24,62 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 	batchSize_(params.getParameter<unsigned>("batchSize")),
 	nInput_(params.getParameter<unsigned>("nInput")),
 	nOutput_(params.getParameter<unsigned>("nOutput")),
-	verbose_(params.getParameter<bool>("verbose"))
+	verbose_(params.getParameter<bool>("verbose")),
+	minSeverityExit_(static_cast<Severity>(params.getParameter<int>("minSeverityExit")))
 {
 }
 
 //todo: add "severity" option to emit LogWarning instead of exception
 template <typename Client>
-std::exception_ptr TritonClient<Client>::wrap(const nic::Error& err, const std::string& msg) const {
+std::exception_ptr TritonClient<Client>::wrap(const nic::Error& err, const std::string& msg, Severity sev) const {
+	std::exception_ptr eptr;
 	if (!err.IsOk()){
-		cms::Exception ex("TritonServerFailure");
-		ex << msg << ": " << err;
-		return make_exception_ptr(ex);
+		if(sev>minSeverityExit_){
+			cms::Exception ex("TritonServerFailure");
+			ex << msg << ": " << err;
+			eptr = make_exception_ptr(ex);
+		}
+		else {
+			//just emit warning
+			edm::LogWarning("TritonServerWarning") << msg << ": " << err;
+		}
 	}
-	return std::exception_ptr{};
+	return eptr;
 }
 
 template <typename Client>
 std::exception_ptr TritonClient<Client>::setup() {
 	std::exception_ptr exptr{};
 
-	exptr = wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false), "setup(): unable to create inference context");
+	exptr = wrap(
+		nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
+		"setup(): unable to create inference context",
+		Severity::High
+	);
 	if(exptr) return exptr;
 
 	std::unique_ptr<nic::InferContext::Options> options;
-	exptr = wrap(nic::InferContext::Options::Create(&options), "setup(): unable to create inference context options");
+	exptr = wrap(
+		nic::InferContext::Options::Create(&options),
+		"setup(): unable to create inference context options",
+		Severity::Low
+	);
 	if(exptr) return exptr;
 
 	options->SetBatchSize(batchSize_);
 	for (const auto& output : context_->Outputs()) {
-		exptr = wrap(options->AddRawResult(output), "setup(): unable to add raw result");
+		exptr = wrap(
+			options->AddRawResult(output),
+			"setup(): unable to add raw result",
+			Severity::Low
+		);
 		if(exptr) return exptr;
 	}
-	exptr = wrap(context_->SetRunOptions(*options), "setup(): unable to set run options");
+	exptr = wrap(
+		context_->SetRunOptions(*options),
+		"setup(): unable to set run options",
+		Severity::Low
+	);
 	if(exptr) return exptr;
 
 	const auto& nicInputs = context_->Inputs();
@@ -66,7 +90,11 @@ std::exception_ptr TritonClient<Client>::setup() {
 	std::vector<int64_t> input_shape;
 	for(unsigned i0 = 0; i0 < batchSize_; i0++) {
 		float *arr = &(this->input_.data()[i0 * nInput_]);
-		exptr = wrap(nicInput_->SetRaw(reinterpret_cast<const uint8_t *>(arr), nInput_ * sizeof(float)), "setup(): unable to set data for batch entry "+std::to_string(i0));
+		exptr = wrap(
+			nicInput_->SetRaw(reinterpret_cast<const uint8_t *>(arr), nInput_ * sizeof(float)),
+			"setup(): unable to set data for batch entry "+std::to_string(i0),
+			Severity::High
+		);
 		if(exptr) return exptr;
 	}
 	auto t2 = std::chrono::high_resolution_clock::now();
@@ -85,7 +113,11 @@ std::exception_ptr TritonClient<Client>::getResults(const std::unique_ptr<nic::I
 	for (unsigned i0 = 0; i0 < batchSize_; i0++) {
 		const uint8_t* r0;
 		size_t content_byte_size;
-		exptr = wrap(result->GetRaw(i0, &r0, &content_byte_size),"getResults(): unable to get raw for entry "+std::to_string(i0));
+		exptr = wrap(
+			result->GetRaw(i0, &r0, &content_byte_size),
+			"getResults(): unable to get raw for entry "+std::to_string(i0),
+			Severity::High
+		);
 		if(exptr) return exptr;
 		const float* lVal = reinterpret_cast<const float*>(r0);
 		for(unsigned i1 = 0; i1 < nOutput_; i1++) this->output_[i0*nOutput_+i1] = lVal[i1]; //This should be replaced with a memcpy
@@ -113,7 +145,11 @@ void TritonClient<Client>::evaluate(){
 	//blocking call
 	auto t1 = std::chrono::high_resolution_clock::now();
 	std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-	exptr = wrap(context_->Run(&results),"evaluate(): unable to run and/or get result");
+	exptr = wrap(
+		context_->Run(&results),
+		"evaluate(): unable to run and/or get result",
+		Severity::High
+	);
 	if(exptr){
 		this->output_.resize(nOutput_ * batchSize_, 0.f);
 		this->finish(false,exptr);
@@ -150,34 +186,42 @@ void TritonClientAsync::evaluate(){
 
 	//non-blocking call
 	auto t1 = std::chrono::high_resolution_clock::now();
-	exptr = wrap(context_->AsyncRun(
-		[t1,start_status,this](nic::InferContext* ctx, const std::shared_ptr<nic::InferContext::Request>& request) {
-			//get results
-			std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-			auto exptr = this->wrap(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
-			if(exptr) {
-				this->output_.resize(nOutput_ * batchSize_, 0.f);
-				this->finish(false,exptr);
-				return;
+	exptr = wrap(
+		context_->AsyncRun(
+			[t1,start_status,this](nic::InferContext* ctx, const std::shared_ptr<nic::InferContext::Request>& request) {
+				//get results
+				std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+				auto exptr = this->wrap(
+					ctx->GetAsyncRunResults(request, &results),
+					"evaluate(): unable to get result",
+					Severity::High
+				);
+				if(exptr) {
+					this->output_.resize(nOutput_ * batchSize_, 0.f);
+					this->finish(false,exptr);
+					return;
+				}
+				auto t2 = std::chrono::high_resolution_clock::now();
+
+				edm::LogInfo("TritonClient") << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+
+				const auto& end_status = this->getServerSideStatus();
+
+				if(this->verbose()){
+					const auto& stats = this->summarizeServerStats(start_status, end_status);
+					this->reportServerSideStats(stats);
+				}
+
+				//check result
+				exptr = this->getResults(results.begin()->second);
+
+				//finish
+				this->finish(exptr==nullptr,exptr);
 			}
-			auto t2 = std::chrono::high_resolution_clock::now();
-
-			edm::LogInfo("TritonClient") << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-
-			const auto& end_status = this->getServerSideStatus();
-
-			if(this->verbose()){
-				const auto& stats = this->summarizeServerStats(start_status, end_status);
-				this->reportServerSideStats(stats);
-			}
-
-			//check result
-			exptr = this->getResults(results.begin()->second);
-
-			//finish
-			this->finish(exptr==nullptr,exptr);
-		}
-	), "evaluate(): unable to launch async run");
+		),
+		"evaluate(): unable to launch async run",
+		Severity::High
+	);
 
 	//if AsyncRun failed, finish() wasn't called
 	if(exptr) this->finish(false,exptr);

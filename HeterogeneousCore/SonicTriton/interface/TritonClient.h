@@ -57,10 +57,13 @@ class TritonClient : public Client {
 			descClient.add<int>("modelVersion",-1);
 			descClient.add<bool>("verbose",false);
 			descClient.add<int>("minSeverityExit",0);
+			descClient.add<unsigned>("allowedTries", 0);
 			iDesc.add<edm::ParameterSetDescription>("Client",descClient);
 		}
 
 	protected:
+		unsigned allowedTries() const override { return allowedTries_; }
+
 		void evaluate() override;
 
 		//helper for common ops
@@ -86,6 +89,7 @@ class TritonClient : public Client {
 		unsigned nOutput_;
 		bool verbose_;
 		Severity minSeverityExit_;
+		unsigned allowedTries_;
 		std::unique_ptr<nic::InferContext> context_;
 		std::unique_ptr<nic::ServerStatusContext> serverCtx_;
 		std::shared_ptr<nic::InferContext::Input> nicInput_; 

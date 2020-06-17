@@ -25,7 +25,8 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 	nInput_(params.getParameter<unsigned>("nInput")),
 	nOutput_(params.getParameter<unsigned>("nOutput")),
 	verbose_(params.getParameter<bool>("verbose")),
-	minSeverityExit_(static_cast<Severity>(params.getParameter<int>("minSeverityExit")))
+	minSeverityExit_(static_cast<Severity>(params.getParameter<int>("minSeverityExit"))),
+	allowedTries_(params.getParameter<unsigned>("allowedTries"))
 {
 }
 

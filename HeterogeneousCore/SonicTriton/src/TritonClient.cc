@@ -9,6 +9,7 @@
 #include <chrono>
 #include <exception>
 #include <sstream>
+#include <cstring>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -121,7 +122,7 @@ std::exception_ptr TritonClient<Client>::getResults(const std::unique_ptr<nic::I
 		);
 		if(exptr) return exptr;
 		const float* lVal = reinterpret_cast<const float*>(r0);
-		for(unsigned i1 = 0; i1 < nOutput_; i1++) this->output_[i0*nOutput_+i1] = lVal[i1]; //This should be replaced with a memcpy
+		std::memcpy(&this->output_[i0*nOutput_],lVal,nOutput_*sizeof(float));
 	}
 	auto t2 = std::chrono::high_resolution_clock::now();
 	edm::LogInfo("TritonClient") << "Output time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();

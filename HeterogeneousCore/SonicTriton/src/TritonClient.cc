@@ -60,6 +60,19 @@ std::exception_ptr TritonClient<Client>::setup() {
 	);
 	if(exptr) return exptr;
 
+	//only used for monitoring
+	bool has_server = false;
+	if(verbose_){
+		auto server_err = nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false);
+		wrap(
+			server_err,
+			"setup(): unable to create server context",
+			Severity::None
+		);
+		has_server = server_err.IsOk();
+	}
+	if(!has_server) serverCtx_ = nullptr;
+
 	std::unique_ptr<nic::InferContext::Options> options;
 	exptr = wrap(
 		nic::InferContext::Options::Create(&options),
@@ -305,11 +318,13 @@ typename TritonClient<Client>::ServerSideStats TritonClient<Client>::summarizeSe
 
 template <typename Client>
 ni::ModelStatus TritonClient<Client>::getServerSideStatus() const {
-	ni::ServerStatus server_status;
-	serverCtx_->GetServerStatus(&server_status);
-	auto itr = server_status.model_status().find(modelName_);
-	if (itr != server_status.model_status().end()) return itr->second;
-	else return ni::ModelStatus{};
+	if(serverCtx_){
+		ni::ServerStatus server_status;
+		serverCtx_->GetServerStatus(&server_status);
+		auto itr = server_status.model_status().find(modelName_);
+		if (itr != server_status.model_status().end()) return itr->second;
+	}
+	return ni::ModelStatus{};
 }
 
 //explicit template instantiations

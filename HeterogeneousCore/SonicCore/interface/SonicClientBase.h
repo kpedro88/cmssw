@@ -19,7 +19,8 @@ public:
   void setDebugName(const std::string& debugName) {
     debugName_ = debugName;
     fullDebugName_ = debugName_;
-	if(!clientName_.empty()) fullDebugName_ += ":"+clientName_;
+    if (!clientName_.empty())
+      fullDebugName_ += ":" + clientName_;
   }
   const std::string& debugName() const { return debugName_; }
   const std::string& clientName() const { return clientName_; }
@@ -60,7 +61,7 @@ protected:
     if (!debugName_.empty()) {
       auto t1 = std::chrono::high_resolution_clock::now();
       edm::LogInfo(fullDebugName_) << "Client time: "
-                               << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0_).count();
+                                   << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0_).count();
     }
     holder_.doneWaiting(eptr);
   }

@@ -43,6 +43,7 @@ class TritonClient : public Client {
 		unsigned nOutput() const { return nOutput_; }
 		unsigned batchSize() const { return batchSize_; }
 		bool verbose() const { return verbose_; }
+		void setBatchSize(unsigned bsize) { batchSize_ = bsize; }
 
 		//for fillDescriptions
 		static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {

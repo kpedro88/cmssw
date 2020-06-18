@@ -147,6 +147,12 @@ std::exception_ptr TritonClient<Client>::getResults(const std::unique_ptr<nic::I
 //default case for sync and pseudo async
 template <typename Client>
 void TritonClient<Client>::evaluate(){
+	//in case there is nothing to process
+	if(this->batchSize_==0) {
+		this->finish(true);
+		return;
+	}
+
 	//common operations first
 	auto exptr = setup();
 	if(exptr) {
@@ -189,6 +195,12 @@ void TritonClient<Client>::evaluate(){
 //specialization for true async
 template <>
 void TritonClientAsync::evaluate(){
+	//in case there is nothing to process
+	if(this->batchSize_==0) {
+		this->finish(true);
+		return;
+	}
+
 	//common operations first
 	auto exptr = setup();
 	if(exptr) {

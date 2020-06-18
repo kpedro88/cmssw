@@ -30,6 +30,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params) :
 	minSeverityExit_(static_cast<Severity>(params.getParameter<int>("minSeverityExit"))),
 	allowedTries_(params.getParameter<unsigned>("allowedTries"))
 {
+	this->clientName_ = "TritonClient";
 }
 
 template <typename Client>
@@ -113,7 +114,7 @@ std::exception_ptr TritonClient<Client>::setup() {
 		if(exptr) return exptr;
 	}
 	auto t2 = std::chrono::high_resolution_clock::now();
-	edm::LogInfo("TritonClient") << "Image array time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
+	if(!this->debugName_.empty()) edm::LogInfo(this->fullDebugName_) << "Input array time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
 
 	//should be empty
 	return exptr;
@@ -138,7 +139,7 @@ std::exception_ptr TritonClient<Client>::getResults(const std::unique_ptr<nic::I
 		std::memcpy(&this->output_[i0*nOutput_],lVal,nOutput_*sizeof(float));
 	}
 	auto t2 = std::chrono::high_resolution_clock::now();
-	edm::LogInfo("TritonClient") << "Output time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
+	if(!this->debugName_.empty()) edm::LogInfo(this->fullDebugName_) << "Output array time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
 
 	//should be empty
 	return exptr;
@@ -178,7 +179,7 @@ void TritonClient<Client>::evaluate(){
 	}
 
 	auto t2 = std::chrono::high_resolution_clock::now();
-	edm::LogInfo("TritonClient") << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	if(!this->debugName_.empty()) edm::LogInfo(this->fullDebugName_) << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
 	const auto& end_status = this->getServerSideStatus();
 
@@ -230,7 +231,7 @@ void TritonClientAsync::evaluate(){
 				}
 				auto t2 = std::chrono::high_resolution_clock::now();
 
-				edm::LogInfo("TritonClient") << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+				if(!this->debugName_.empty()) edm::LogInfo(this->fullDebugName_) << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
 				const auto& end_status = this->getServerSideStatus();
 
@@ -280,7 +281,7 @@ void TritonClient<Client>::reportServerSideStats(const typename TritonClient<Cli
 			<< "compute " << compute_avg_us << " usec)" << std::endl;
 	}
 
-	edm::LogInfo("TritonClient") << msg.str();
+	if(!this->debugName_.empty()) edm::LogInfo(this->fullDebugName_) << msg.str();
 }
 
 template <typename Client>

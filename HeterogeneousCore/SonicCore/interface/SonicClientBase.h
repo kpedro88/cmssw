@@ -28,6 +28,9 @@ public:
   //main operation
   virtual void dispatch(edm::WaitingTaskWithArenaHolder holder) = 0;
 
+  //helper
+  virtual void reset() = 0;
+
 protected:
   virtual void evaluate() = 0;
 

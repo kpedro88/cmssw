@@ -18,6 +18,8 @@ public:
 
     evaluate();
   }
+  //do nothing by default
+  void reset() override {}
 };
 
 #endif

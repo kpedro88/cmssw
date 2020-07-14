@@ -45,6 +45,8 @@ public:
     }
     cond_.notify_one();
   }
+  //do nothing by default
+  void reset() override {}
 
 private:
   void waitForNext() {

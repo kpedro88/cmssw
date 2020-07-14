@@ -35,11 +35,13 @@ public:
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     // create an npix x npix x ncol image w/ arbitrary color value
-    iInput.resize(client_.nInput() * client_.batchSize(), 0.5f);
+    // model only has one input, so just pick begin()
+    auto& input = iInput.begin()->second;
+    input.vec().resize(input.size_dims() * client_.batchSize(), 0.5f);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results
-    findTopN(iOutput);
+    findTopN(iOutput.begin()->second);
   }
   ~TritonImageProducer() override = default;
 
@@ -54,13 +56,13 @@ public:
 
 private:
   using SonicEDProducer<Client>::client_;
-  void findTopN(const std::vector<float>& scores, unsigned n = 5) const {
-    auto dim = client_.nOutput();
+  void findTopN(const TritonOutputData& scores, unsigned n = 5) const {
+    auto dim = scores.size_dims();
     for (unsigned i0 = 0; i0 < client_.batchSize(); i0++) {
       //match score to type by index, then put in largest-first map
       std::map<float, std::string, std::greater<float>> score_map;
       for (unsigned i = 0; i < std::min((unsigned)dim, (unsigned)imageList_.size()); ++i) {
-        score_map.emplace(scores[i0 * dim + i], imageList_[i]);
+        score_map.emplace(scores.vec()[i0 * dim + i], imageList_[i]);
       }
       //get top n
       std::stringstream msg;

@@ -6,10 +6,13 @@
 #include "HeterogeneousCore/SonicCore/interface/SonicClientSync.h"
 #include "HeterogeneousCore/SonicCore/interface/SonicClientPseudoAsync.h"
 #include "HeterogeneousCore/SonicCore/interface/SonicClientAsync.h"
+#include "HeterogeneousCore/SonicTriton/interface/TritonData.h"
 
+#include <map>
 #include <vector>
 #include <string>
 #include <exception>
+#include <unordered_map>
 
 #include "request_grpc.h"
 
@@ -30,16 +33,13 @@ public:
   TritonClient(const edm::ParameterSet& params);
 
   //helper
-  bool getResults(const InferContext::Result& result);
+  bool getResults(const std::map<std::string, std::unique_ptr<InferContext::Result>>& results);
 
   //accessors
-  const std::vector<int64_t>& dimsInput() const { return dimsInput_; }
-  const std::vector<int64_t>& dimsOutput() const { return dimsOutput_; }
-  unsigned nInput() const { return nInput_; }
-  unsigned nOutput() const { return nOutput_; }
   unsigned batchSize() const { return batchSize_; }
   bool verbose() const { return verbose_; }
-  void setBatchSize(unsigned bsize) { batchSize_ = bsize; }
+  bool setBatchSize(unsigned bsize);
+  void reset() override;
 
   //for fillDescriptions
   static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {
@@ -77,32 +77,27 @@ protected:
   unsigned timeout_;
   std::string modelName_;
   int modelVersion_;
+  unsigned maxBatchSize_;
   unsigned batchSize_;
-  std::vector<int64_t> dimsInput_;
-  std::vector<int64_t> dimsOutput_;
-  unsigned nInput_;
-  unsigned nOutput_;
   bool verbose_;
   unsigned allowedTries_;
 
   std::unique_ptr<InferContext> context_;
   std::unique_ptr<nvidia::inferenceserver::client::ServerStatusContext> serverCtx_;
   std::unique_ptr<InferContext::Options> options_;
-  std::shared_ptr<InferContext::Input> nicInput_;
-  std::shared_ptr<InferContext::Output> nicOutput_;
 };
 
-using TritonClientSync = TritonClient<SonicClientSync<std::vector<float>>>;
-using TritonClientPseudoAsync = TritonClient<SonicClientPseudoAsync<std::vector<float>>>;
-using TritonClientAsync = TritonClient<SonicClientAsync<std::vector<float>>>;
+using TritonClientSync = TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
+using TritonClientPseudoAsync = TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;
+using TritonClientAsync = TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
 
-//avoid ""explicit specialization after instantiation" error
+//avoid "explicit specialization after instantiation" error
 template <>
 void TritonClientAsync::evaluate();
 
 //explicit template instantiation declarations
-extern template class TritonClient<SonicClientSync<std::vector<float>>>;
-extern template class TritonClient<SonicClientAsync<std::vector<float>>>;
-extern template class TritonClient<SonicClientPseudoAsync<std::vector<float>>>;
+extern template class TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
+extern template class TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
+extern template class TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;
 
 #endif

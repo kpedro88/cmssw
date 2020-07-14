@@ -15,16 +15,8 @@
 #include <algorithm>
 #include <iterator>
 
-//little vector helper functions
+//helper function
 namespace {
-  bool any_neg(const std::vector<int64_t>& vec) {
-    return std::any_of(vec.begin(), vec.end(), [](int64_t i) { return i < 0; });
-  }
-
-  int64_t dim_product(const std::vector<int64_t>& vec) {
-    return std::accumulate(vec.begin(), vec.end(), 1, std::multiplies<int64_t>());
-  }
-
   std::string print_vec(const std::vector<int64_t>& vec) {
     if (vec.empty())
       return "";
@@ -49,10 +41,11 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
       timeout_(params.getUntrackedParameter<unsigned>("timeout")),
       modelName_(params.getParameter<std::string>("modelName")),
       modelVersion_(params.getParameter<int>("modelVersion")),
-      batchSize_(params.getUntrackedParameter<unsigned>("batchSize")),
       verbose_(params.getUntrackedParameter<bool>("verbose")),
       allowedTries_(params.getUntrackedParameter<unsigned>("allowedTries")) {
   this->clientName_ = "TritonClient";
+  //will get overwritten later, just used in constructor
+  this->fullDebugName_ = this->clientName_;
 
   //connect to the server
   wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
@@ -64,6 +57,14 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
        "TritonClient(): unable to create inference context options",
        true);
 
+  //check batch size limitations
+  //triton uses max batch size = 0 to denote a model that does not support batching
+  //but for models that do support batching, a given event may set batch size 0 to indicate no valid input is present
+  //so set the triton max to 1
+  maxBatchSize_ = std::min(1ul,context_->MaxBatchSize());
+  batchSize_ = maxBatchSize_;
+  this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
+
   //get input and output (which know their sizes)
   const auto& nicInputs = context_->Inputs();
   const auto& nicOutputs = context_->Outputs();
@@ -73,62 +74,78 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   std::string msg_str;
 
   //currently no use case is foreseen for a model with zero inputs or outputs
-  //models with multiple named inputs or outputs currently aren't supported
   if (nicInputs.empty())
     msg << "Model on server appears malformed (zero inputs)\n";
-  else if (nicInputs.size() > 1)
-    msg << "Model has multiple inputs (not supported)\n";
 
   if (nicOutputs.empty())
     msg << "Model on server appears malformed (zero outputs)\n";
-  else if (nicOutputs.size() > 1)
-    msg << "Model has multiple outputs (not supported)\n";
 
   //stop if errors
   msg_str = msg.str();
   if (!msg_str.empty())
     throw cms::Exception("ModelErrors") << msg_str;
 
-  //get sizes
-  nicInput_ = nicInputs[0];
-  nicOutput_ = nicOutputs[0];
-  //convert google::protobuf::RepeatedField to vector
-  const auto& dimsInputTmp = nicInput_->Dims();
-  dimsInput_.assign(dimsInputTmp.begin(), dimsInputTmp.end());
-  const auto& dimsOutputTmp = nicOutput_->Dims();
-  dimsOutput_.assign(dimsOutputTmp.begin(), dimsOutputTmp.end());
+  //print model info
+  if (verbose_) {
+    msg.str("");
+    msg << "Model name: " << modelName_ << "\n"
+        << "Model version: " << modelVersion_ << "\n"
+        << "Model max batch size: " << maxBatchSize_ << "\n";
+  }
 
-  //check sizes: variable-size dimensions reported as -1 (currently not supported)
-  if (any_neg(dimsInput_))
-    msg << "Model has variable-size inputs (not supported)\n";
-  if (any_neg(dimsOutput_))
-    msg << "Model has variable-size outputs (not supported)\n";
+  //setup input map
+  if (verbose_) msg << "Model inputs: " << "\n";
+  for (const auto& nicInput : nicInputs) {
+    const auto& iname = nicInput->Name();
+    const auto& curr_input = this->input_.emplace(iname,nicInput);
+    if (verbose_) {
+      msg << "  " << iname << ": " << print_vec(curr_input.first->second.dims()) << "\n";
+    }
+  }
 
-  //stop if errors
-  msg_str = msg.str();
-  if (!msg_str.empty())
-    throw cms::Exception("ModelErrors") << msg_str;
-
-  //compute sizes
-  nInput_ = dim_product(dimsInput_);
-  nOutput_ = dim_product(dimsOutput_);
+  //setup output map
+  if (verbose_) msg << "Model outputs: " << "\n";
+  for (const auto& nicOutput : nicOutputs) {
+    const auto& oname = nicOutput->Name();
+    const auto& curr_output = this->output_.emplace(oname,nicOutput);
+    if (verbose_) {
+      msg << "  " << oname << ": " << print_vec(curr_output.first->second.dims()) << "\n";
+    }
+  }
 
   //only used for monitoring
   bool has_server = false;
   if (verbose_) {
-    //print model info (debug name not set yet)
-    const auto& input_str = print_vec(dimsInput_);
-    const auto& output_str = print_vec(dimsOutput_);
-    edm::LogInfo(this->clientName_) << "Model name: " << modelName_ << "\n"
-                                    << "Model version: " << modelVersion_ << "\n"
-                                    << "Model input: " << input_str << "\n"
-                                    << "Model output: " << output_str;
+    //print model info
+    edm::LogInfo(this->fullDebugName_) << msg.str();
 
     has_server = wrap(nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false),
                       "TritonClient(): unable to create server context");
   }
   if (!has_server)
     serverCtx_ = nullptr;
+}
+
+template <typename Client>
+bool TritonClient<Client>::setBatchSize(unsigned bsize) {
+  if (batchSize_>maxBatchSize_) {
+    edm::LogWarning(this->fullDebugName_) << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_ << ". Batch size will remain as" << batchSize_;
+    return false;
+  }
+  else {
+    batchSize_ = bsize;
+    return true;
+  }
+}
+
+template <typename Client>
+void TritonClient<Client>::reset() {
+  for (auto& element: this->input_) {
+    element.second.reset();
+  }
+  for (auto& element: this->output_) {
+    element.second.reset();
+  }
 }
 
 template <typename Client>
@@ -155,24 +172,42 @@ bool TritonClient<Client>::setup() {
     return status;
 
   options->SetBatchSize(batchSize_);
-  status = wrap(options->AddRawResult(nicOutput_), "setup(): unable to add raw result");
-  if (!status)
-    return status;
+  for (const auto& element : this->output_) {
+    status = wrap(options->AddRawResult(element.second.data()), "setup(): unable to add raw result");
+    if (!status)
+      return status;
+  }
 
   status = wrap(context_->SetRunOptions(*options), "setup(): unable to set run options");
   if (!status)
     return status;
 
-  nicInput_->Reset();
-
   auto t1 = std::chrono::high_resolution_clock::now();
-  std::vector<int64_t> input_shape;
-  for (unsigned i0 = 0; i0 < batchSize_; i0++) {
-    float* arr = &(this->input_[i0 * nInput_]);
-    status = wrap(nicInput_->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput_ * sizeof(float)),
-                  "setup(): unable to set data for batch entry " + std::to_string(i0));
-    if (!status)
-      return status;
+  for (auto& element : this->input_) {
+    auto& input = element.second;
+
+    //shape must be specified for variable dims
+    if (input.variable_dims()) {
+      if (input.shape().size()!=input.dims().size()) {
+        edm::LogError("TritonClientError") << "setup(): incorrect or missing shape (" << print_vec(input.shape()) << ") for model with variable dimensions (" << print_vec(input.dims()) << ")";
+        return false;
+      }
+      else {
+        status = wrap(input.data()->SetShape(input.shape()), "setup(): unable to set input shape");
+        if (!status)
+          return status;
+      }
+    }
+    int64_t nInput = input.size_shape();
+
+    //batchSize 0 implies batchSize 1
+    for (unsigned i0 = 0; i0 < batchSize_; i0++) {
+      float* arr = &(input.vec()[i0 * nInput]);
+      status = wrap(input.data()->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * sizeof(float)),
+                    "setup(): unable to set data for batch entry " + std::to_string(i0));
+      if (!status)
+        return status;
+    }
   }
   auto t2 = std::chrono::high_resolution_clock::now();
   if (!this->debugName_.empty())
@@ -184,20 +219,42 @@ bool TritonClient<Client>::setup() {
 }
 
 template <typename Client>
-bool TritonClient<Client>::getResults(const nic::InferContext::Result& result) {
+bool TritonClient<Client>::getResults(const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>& results) {
   bool status = true;
 
   auto t1 = std::chrono::high_resolution_clock::now();
-  this->output_.resize(nOutput_ * batchSize_, 0.f);
-  for (unsigned i0 = 0; i0 < batchSize_; i0++) {
-    const uint8_t* r0;
-    size_t content_byte_size;
-    status = wrap(result.GetRaw(i0, &r0, &content_byte_size),
-                  "getResults(): unable to get raw for entry " + std::to_string(i0));
-    if (!status)
-      return status;
-    std::memcpy(&this->output_[i0 * nOutput_], r0, nOutput_ * sizeof(float));
+  for (const auto& element: results) {
+    const auto& oname = element.first;
+    const auto& result = element.second;
+
+    //check for corresponding entry in output map
+    auto itr = this->output_.find(oname);
+    if (itr==this->output_.end()) {
+      edm::LogError("TritonServerError") << "getResults(): no entry in output map for result " << oname;
+      return false;
+    }
+    auto& output = itr->second;
+
+    //shape must be specified for variable dims
+    if (output.variable_dims()) {
+      status = wrap(result->GetRawShape(&(output.shape())), "getResults(): unable to get output shape");
+      if (!status)
+        return status;
+    }
+    int64_t nOutput = output.size_shape();
+
+    output.vec().resize(nOutput * batchSize_, 0.f);
+    for (unsigned i0 = 0; i0 < batchSize_; i0++) {
+      const uint8_t* r0;
+      size_t content_byte_size;
+      status = wrap(result->GetRaw(i0, &r0, &content_byte_size),
+                    "getResults(): unable to get raw for entry " + std::to_string(i0));
+      if (!status)
+        return status;
+      std::memcpy(&(output.vec()[i0 * nOutput]), r0, nOutput * sizeof(float));
+    }
   }
+
   auto t2 = std::chrono::high_resolution_clock::now();
   if (!this->debugName_.empty())
     edm::LogInfo(this->fullDebugName_) << "Output array time: "
@@ -231,7 +288,6 @@ void TritonClient<Client>::evaluate() {
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   status = wrap(context_->Run(&results), "evaluate(): unable to run and/or get result");
   if (!status) {
-    this->output_.resize(nOutput_ * batchSize_, 0.f);
     this->finish(false);
     return;
   }
@@ -248,7 +304,7 @@ void TritonClient<Client>::evaluate() {
     reportServerSideStats(stats);
   }
 
-  status = getResults(*results.begin()->second);
+  status = getResults(results);
 
   this->finish(status);
 }
@@ -282,7 +338,6 @@ void TritonClientAsync::evaluate() {
         std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
         status = wrap(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
         if (!status) {
-          output_.resize(nOutput_ * batchSize_, 0.f);
           finish(false);
           return;
         }
@@ -300,7 +355,7 @@ void TritonClientAsync::evaluate() {
         }
 
         //check result
-        status = getResults(*results.begin()->second);
+        status = getResults(results);
 
         //finish
         finish(status);
@@ -400,6 +455,6 @@ ni::ModelStatus TritonClient<Client>::getServerSideStatus() const {
 }
 
 //explicit template instantiations
-template class TritonClient<SonicClientSync<std::vector<float>>>;
-template class TritonClient<SonicClientAsync<std::vector<float>>>;
-template class TritonClient<SonicClientPseudoAsync<std::vector<float>>>;
+template class TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
+template class TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
+template class TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;

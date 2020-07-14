@@ -23,5 +23,5 @@ The default local server address is `0.0.0.0`.
 
 Run the test:
 ```
-cmsRun imageTest.py maxEvents=1
+cmsRun imageTest_cfg.py maxEvents=1
 ```

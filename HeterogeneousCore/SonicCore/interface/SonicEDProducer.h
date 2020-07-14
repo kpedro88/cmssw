@@ -28,6 +28,8 @@ public:
   //(no need to interact with callback holder)
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, edm::WaitingTaskWithArenaHolder holder) final {
     auto t0 = std::chrono::high_resolution_clock::now();
+    //reset client data
+    client_.reset();
     acquire(iEvent, iSetup, client_.input());
     auto t1 = std::chrono::high_resolution_clock::now();
     if (!client_.debugName().empty())

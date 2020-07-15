@@ -61,7 +61,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   //triton uses max batch size = 0 to denote a model that does not support batching
   //but for models that do support batching, a given event may set batch size 0 to indicate no valid input is present
   //so set the triton max to 1
-  maxBatchSize_ = std::min(1ul,context_->MaxBatchSize());
+  maxBatchSize_ = std::min(1ul, context_->MaxBatchSize());
   batchSize_ = maxBatchSize_;
   this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
 
@@ -94,20 +94,24 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   }
 
   //setup input map
-  if (verbose_) msg << "Model inputs: " << "\n";
+  if (verbose_)
+    msg << "Model inputs: "
+        << "\n";
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput->Name();
-    const auto& curr_input = this->input_.emplace(iname,nicInput);
+    const auto& curr_input = this->input_.emplace(iname, nicInput);
     if (verbose_) {
       msg << "  " << iname << ": " << print_vec(curr_input.first->second.dims()) << "\n";
     }
   }
 
   //setup output map
-  if (verbose_) msg << "Model outputs: " << "\n";
+  if (verbose_)
+    msg << "Model outputs: "
+        << "\n";
   for (const auto& nicOutput : nicOutputs) {
     const auto& oname = nicOutput->Name();
-    const auto& curr_output = this->output_.emplace(oname,nicOutput);
+    const auto& curr_output = this->output_.emplace(oname, nicOutput);
     if (verbose_) {
       msg << "  " << oname << ": " << print_vec(curr_output.first->second.dims()) << "\n";
     }
@@ -128,11 +132,12 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
 
 template <typename Client>
 bool TritonClient<Client>::setBatchSize(unsigned bsize) {
-  if (batchSize_>maxBatchSize_) {
-    edm::LogWarning(this->fullDebugName_) << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_ << ". Batch size will remain as" << batchSize_;
+  if (batchSize_ > maxBatchSize_) {
+    edm::LogWarning(this->fullDebugName_)
+        << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_
+        << ". Batch size will remain as" << batchSize_;
     return false;
-  }
-  else {
+  } else {
     batchSize_ = bsize;
     return true;
   }
@@ -140,10 +145,10 @@ bool TritonClient<Client>::setBatchSize(unsigned bsize) {
 
 template <typename Client>
 void TritonClient<Client>::reset() {
-  for (auto& element: this->input_) {
+  for (auto& element : this->input_) {
     element.second.reset();
   }
-  for (auto& element: this->output_) {
+  for (auto& element : this->output_) {
     element.second.reset();
   }
 }
@@ -188,11 +193,12 @@ bool TritonClient<Client>::setup() {
 
     //shape must be specified for variable dims
     if (input.variable_dims()) {
-      if (input.shape().size()!=input.dims().size()) {
-        edm::LogError("TritonClientError") << "setup(): incorrect or missing shape (" << print_vec(input.shape()) << ") for model with variable dimensions (" << print_vec(input.dims()) << ")";
+      if (input.shape().size() != input.dims().size()) {
+        edm::LogError("TritonClientError")
+            << "setup(): incorrect or missing shape (" << print_vec(input.shape())
+            << ") for model with variable dimensions (" << print_vec(input.dims()) << ")";
         return false;
-      }
-      else {
+      } else {
         status = wrap(input.data()->SetShape(input.shape()), "setup(): unable to set input shape");
         if (!status)
           return status;
@@ -223,13 +229,13 @@ bool TritonClient<Client>::getResults(const std::map<std::string, std::unique_pt
   bool status = true;
 
   auto t1 = std::chrono::high_resolution_clock::now();
-  for (const auto& element: results) {
+  for (const auto& element : results) {
     const auto& oname = element.first;
     const auto& result = element.second;
 
     //check for corresponding entry in output map
     auto itr = this->output_.find(oname);
-    if (itr==this->output_.end()) {
+    if (itr == this->output_.end()) {
       edm::LogError("TritonServerError") << "getResults(): no entry in output map for result " << oname;
       return false;
     }
@@ -455,6 +461,6 @@ ni::ModelStatus TritonClient<Client>::getServerSideStatus() const {
 }
 
 //explicit template instantiations
-template class TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
-template class TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
-template class TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;
+template class TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
+template class TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
+template class TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;

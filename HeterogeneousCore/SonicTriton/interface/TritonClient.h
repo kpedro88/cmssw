@@ -87,17 +87,17 @@ protected:
   std::unique_ptr<InferContext::Options> options_;
 };
 
-using TritonClientSync = TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
-using TritonClientPseudoAsync = TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;
-using TritonClientAsync = TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
+using TritonClientSync = TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
+using TritonClientPseudoAsync = TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;
+using TritonClientAsync = TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
 
 //avoid "explicit specialization after instantiation" error
 template <>
 void TritonClientAsync::evaluate();
 
 //explicit template instantiation declarations
-extern template class TritonClient<SonicClientSync<TritonInputMap,TritonOutputMap>>;
-extern template class TritonClient<SonicClientAsync<TritonInputMap,TritonOutputMap>>;
-extern template class TritonClient<SonicClientPseudoAsync<TritonInputMap,TritonOutputMap>>;
+extern template class TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
+extern template class TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
+extern template class TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;
 
 #endif

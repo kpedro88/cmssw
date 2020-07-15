@@ -20,7 +20,7 @@ public:
   //accessors
 
   //dims is fixed by the model info on server, immutable
-  const std::vector<int64_t>& dims() const{ return dims_; }
+  const std::vector<int64_t>& dims() const { return dims_; }
 
   //some members can be modified
   std::shared_ptr<IO>& data() { return data_; }
@@ -58,16 +58,15 @@ private:
 };
 
 using TritonInputData = TritonData<nvidia::inferenceserver::client::InferContext::Input>;
-using TritonInputMap = std::unordered_map<std::string,TritonInputData>;
+using TritonInputMap = std::unordered_map<std::string, TritonInputData>;
 using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferContext::Output>;
-using TritonOutputMap = std::unordered_map<std::string,TritonOutputData>;
+using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
 template <>
 void TritonInputData::reset();
 template <>
 void TritonOutputData::reset();
-
 
 //explicit template instantiation declarations
 extern template class TritonData<nvidia::inferenceserver::client::InferContext::Input>;

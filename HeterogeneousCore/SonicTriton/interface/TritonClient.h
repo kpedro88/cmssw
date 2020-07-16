@@ -79,6 +79,7 @@ protected:
   int modelVersion_;
   unsigned maxBatchSize_;
   unsigned batchSize_;
+  bool noBatch_;
   bool verbose_;
   unsigned allowedTries_;
 

@@ -60,8 +60,10 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   //check batch size limitations
   //triton uses max batch size = 0 to denote a model that does not support batching
   //but for models that do support batching, a given event may set batch size 0 to indicate no valid input is present
-  //so set the triton max to 1
-  maxBatchSize_ = std::min(1ul, context_->MaxBatchSize());
+  //so set the local max to 1 and keep track of "no batch" case
+  maxBatchSize_ = context_->MaxBatchSize();
+  noBatch_ = maxBatchSize_ == 0;
+  maxBatchSize_ = std::max(1u, maxBatchSize_);
   batchSize_ = maxBatchSize_;
   this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
 
@@ -90,7 +92,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
     msg.str("");
     msg << "Model name: " << modelName_ << "\n"
         << "Model version: " << modelVersion_ << "\n"
-        << "Model max batch size: " << maxBatchSize_ << "\n";
+        << "Model max batch size: " << (noBatch_ ? 0 : maxBatchSize_) << "\n";
   }
 
   //setup input map
@@ -176,7 +178,8 @@ bool TritonClient<Client>::setup() {
   if (!status)
     return status;
 
-  options->SetBatchSize(batchSize_);
+  if (!noBatch_)
+    options->SetBatchSize(batchSize_);
   for (const auto& element : this->output_) {
     status = wrap(options->AddRawResult(element.second.data()), "setup(): unable to add raw result");
     if (!status)
@@ -206,7 +209,6 @@ bool TritonClient<Client>::setup() {
     }
     int64_t nInput = input.size_shape();
 
-    //batchSize 0 implies batchSize 1
     for (unsigned i0 = 0; i0 < batchSize_; i0++) {
       float* arr = &(input.vec()[i0 * nInput]);
       status = wrap(input.data()->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * input.byte_size()),

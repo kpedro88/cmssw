@@ -37,7 +37,12 @@ public:
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.shape() = {input2.dims()[0], ctr2_};
-    input2.vec().resize(input2.shape()[0] * input2.shape()[1], 0.5f);
+    input2.vec().resize(input2.shape()[0] * input2.shape()[1], 0);
+    for(int i = 0; i < input2.shape()[0]; ++i){
+      for(int j = 0; j < input2.shape()[1]; ++j){
+        if(i!=j) input2.vec()[input2.shape()[1] * i + j] = 1;
+      }
+    }
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results
@@ -45,7 +50,7 @@ public:
     std::stringstream msg;
     for (int i = 0; i < output.shape()[0]; ++i) {
       msg << "output " << i << ": ";
-      for (int j = 0; j < output.shape()[1]; ++i) {
+      for (int j = 0; j < output.shape()[1]; ++j) {
         msg << output.vec()[output.shape()[1] * i + j] << " ";
       }
       msg << "\n";

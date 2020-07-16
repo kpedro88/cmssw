@@ -209,7 +209,7 @@ bool TritonClient<Client>::setup() {
     //batchSize 0 implies batchSize 1
     for (unsigned i0 = 0; i0 < batchSize_; i0++) {
       float* arr = &(input.vec()[i0 * nInput]);
-      status = wrap(input.data()->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * sizeof(float)),
+      status = wrap(input.data()->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * input.byte_size()),
                     "setup(): unable to set data for batch entry " + std::to_string(i0));
       if (!status)
         return status;
@@ -257,7 +257,7 @@ bool TritonClient<Client>::getResults(const std::map<std::string, std::unique_pt
                     "getResults(): unable to get raw for entry " + std::to_string(i0));
       if (!status)
         return status;
-      std::memcpy(&(output.vec()[i0 * nOutput]), r0, nOutput * sizeof(float));
+      std::memcpy(&(output.vec()[i0 * nOutput]), r0, nOutput * output.byte_size());
     }
   }
 

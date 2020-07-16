@@ -32,6 +32,7 @@ public:
   const std::shared_ptr<IO>& data() const { return data_; }
   const std::vector<float>& vec() const { return vec_; }
   const std::vector<int64_t>& shape() const { return shape_; }
+  int64_t byte_size() const { return byte_size_; }
 
   //utilities
   bool variable_dims() const { return variable_dims_; }
@@ -53,6 +54,7 @@ private:
   std::vector<int64_t> dims_;
   bool variable_dims_;
   int64_t product_dims_;
+  int64_t byte_size_;
   std::vector<float> vec_;
   std::vector<int64_t> shape_;
 };

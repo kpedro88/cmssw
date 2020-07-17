@@ -1,6 +1,7 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/SonicTriton/interface/TritonClient.h"
+#include "HeterogeneousCore/SonicTriton/interface/TritonUtils.h"
 
 #include "request_grpc.h"
 
@@ -9,25 +10,8 @@
 #include <chrono>
 #include <exception>
 #include <sstream>
-#include <cstring>
-#include <numeric>
-#include <functional>
-#include <algorithm>
-#include <iterator>
-
-//helper function
-namespace {
-  std::string print_vec(const std::vector<int64_t>& vec) {
-    if (vec.empty())
-      return "";
-    std::stringstream msg;
-    //avoid trailing delim
-    std::copy(vec.begin(), vec.end() - 1, std::ostream_iterator<int64_t>(msg, ","));
-    //last element
-    msg << vec.back();
-    return msg.str();
-  }
-}  // namespace
+#include <utility>
+#include <tuple>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -48,24 +32,12 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   this->fullDebugName_ = this->clientName_;
 
   //connect to the server
-  wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
-       "TritonClient(): unable to create inference context",
-       true);
+  triton_utils::wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
+                     "TritonClient(): unable to create inference context");
 
   //get options
-  wrap(nic::InferContext::Options::Create(&options_),
-       "TritonClient(): unable to create inference context options",
-       true);
-
-  //check batch size limitations
-  //triton uses max batch size = 0 to denote a model that does not support batching
-  //but for models that do support batching, a given event may set batch size 0 to indicate no valid input is present
-  //so set the local max to 1 and keep track of "no batch" case
-  maxBatchSize_ = context_->MaxBatchSize();
-  noBatch_ = maxBatchSize_ == 0;
-  maxBatchSize_ = std::max(1u, maxBatchSize_);
-  batchSize_ = maxBatchSize_;
-  this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
+  triton_utils::wrap(nic::InferContext::Options::Create(&options_),
+                     "TritonClient(): unable to create inference context options");
 
   //get input and output (which know their sizes)
   const auto& nicInputs = context_->Inputs();
@@ -87,46 +59,68 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   if (!msg_str.empty())
     throw cms::Exception("ModelErrors") << msg_str;
 
-  //print model info
-  if (verbose_) {
-    msg.str("");
-    msg << "Model name: " << modelName_ << "\n"
-        << "Model version: " << modelVersion_ << "\n"
-        << "Model max batch size: " << (noBatch_ ? 0 : maxBatchSize_) << "\n";
-  }
-
   //setup input map
+  std::stringstream io_msg;
   if (verbose_)
-    msg << "Model inputs: "
-        << "\n";
+    io_msg << "Model inputs: "
+           << "\n";
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput->Name();
-    const auto& curr_input = this->input_.emplace(iname, nicInput);
+    const auto& curr_itr = this->input_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput));
     if (verbose_) {
-      msg << "  " << iname << ": " << print_vec(curr_input.first->second.dims()) << "\n";
+      const auto& curr_input = curr_itr.first->second;
+      io_msg << "  " << iname << " (" << curr_input.dname() << ", " << curr_input.byte_size()
+             << " b) : " << triton_utils::print_vec(curr_input.dims()) << "\n";
     }
   }
 
   //setup output map
   if (verbose_)
-    msg << "Model outputs: "
-        << "\n";
+    io_msg << "Model outputs: "
+           << "\n";
   for (const auto& nicOutput : nicOutputs) {
     const auto& oname = nicOutput->Name();
-    const auto& curr_output = this->output_.emplace(oname, nicOutput);
+    const auto& curr_itr = this->output_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput));
+    const auto& curr_output = curr_itr.first->second;
+    triton_utils::wrap(options_->AddRawResult(curr_output.data()),
+                       "TritonClient(): unable to add raw result " + curr_itr.first->first);
     if (verbose_) {
-      msg << "  " << oname << ": " << print_vec(curr_output.first->second.dims()) << "\n";
+      io_msg << "  " << oname << " (" << curr_output.dname() << ", " << curr_output.byte_size()
+             << " b) : " << triton_utils::print_vec(curr_output.dims()) << "\n";
     }
+  }
+
+  //check batch size limitations (after i/o setup)
+  //triton uses max batch size = 0 to denote a model that does not support batching
+  //but for models that do support batching, a given event may set batch size 0 to indicate no valid input is present
+  //so set the local max to 1 and keep track of "no batch" case
+  maxBatchSize_ = context_->MaxBatchSize();
+  noBatch_ = maxBatchSize_ == 0;
+  maxBatchSize_ = std::max(1u, maxBatchSize_);
+  //check requested batch size
+  this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
+
+  //initial server settings
+  triton_utils::wrap(context_->SetRunOptions(*options_), "TritonClient(): unable to set run options");
+
+  //print model info
+  std::stringstream model_msg;
+  if (verbose_) {
+    model_msg << "Model name: " << modelName_ << "\n"
+              << "Model version: " << modelVersion_ << "\n"
+              << "Model max batch size: " << (noBatch_ ? 0 : maxBatchSize_) << "\n";
   }
 
   //only used for monitoring
   bool has_server = false;
   if (verbose_) {
     //print model info
-    edm::LogInfo(this->fullDebugName_) << msg.str();
+    edm::LogInfo(this->fullDebugName_) << model_msg.str() << io_msg.str();
 
-    has_server = wrap(nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false),
-                      "TritonClient(): unable to create server context");
+    has_server = triton_utils::warn(nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false),
+                                    "TritonClient(): unable to create server context");
   }
   if (!has_server)
     serverCtx_ = nullptr;
@@ -141,6 +135,18 @@ bool TritonClient<Client>::setBatchSize(unsigned bsize) {
     return false;
   } else {
     batchSize_ = bsize;
+    //set for input and output
+    for (auto& element : this->input_) {
+      element.second.set_batch_size(bsize);
+    }
+    for (auto& element : this->output_) {
+      element.second.set_batch_size(bsize);
+    }
+    //set for server (and Input objects)
+    if (!noBatch_) {
+      options_->SetBatchSize(batchSize_);
+      triton_utils::wrap(context_->SetRunOptions(*options_), "setBatchSize(): unable to set run options");
+    }
     return true;
   }
 }
@@ -156,84 +162,10 @@ void TritonClient<Client>::reset() {
 }
 
 template <typename Client>
-bool TritonClient<Client>::wrap(const nic::Error& err, const std::string& msg, bool stop) const {
-  if (!err.IsOk()) {
-    //throw exception: used in constructor, should not be used in evaluate() or any method called by evaluate()
-    if (stop) {
-      throw cms::Exception("TritonServerFailure") << msg << ": " << err;
-    } else {
-      //emit warning
-      edm::LogWarning("TritonServerWarning") << msg << ": " << err;
-    }
-  }
-  return err.IsOk();
-}
-
-template <typename Client>
-bool TritonClient<Client>::setup() {
-  bool status = true;
-
-  std::unique_ptr<nic::InferContext::Options> options;
-  status = wrap(nic::InferContext::Options::Create(&options), "setup(): unable to create inference context options");
-  if (!status)
-    return status;
-
-  if (!noBatch_)
-    options->SetBatchSize(batchSize_);
-  for (const auto& element : this->output_) {
-    status = wrap(options->AddRawResult(element.second.data()), "setup(): unable to add raw result");
-    if (!status)
-      return status;
-  }
-
-  status = wrap(context_->SetRunOptions(*options), "setup(): unable to set run options");
-  if (!status)
-    return status;
-
-  auto t1 = std::chrono::high_resolution_clock::now();
-  for (auto& element : this->input_) {
-    auto& input = element.second;
-
-    //shape must be specified for variable dims
-    if (input.variable_dims()) {
-      if (input.shape().size() != input.dims().size()) {
-        edm::LogError("TritonClientError")
-            << "setup(): incorrect or missing shape (" << print_vec(input.shape())
-            << ") for model with variable dimensions (" << print_vec(input.dims()) << ")";
-        return false;
-      } else {
-        status = wrap(input.data()->SetShape(input.shape()), "setup(): unable to set input shape");
-        if (!status)
-          return status;
-      }
-    }
-    int64_t nInput = input.size_shape();
-
-    for (unsigned i0 = 0; i0 < batchSize_; i0++) {
-      float* arr = &(input.vec()[i0 * nInput]);
-      status = wrap(input.data()->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * input.byte_size()),
-                    "setup(): unable to set data for batch entry " + std::to_string(i0));
-      if (!status)
-        return status;
-    }
-  }
-  auto t2 = std::chrono::high_resolution_clock::now();
-  if (!this->debugName_.empty())
-    edm::LogInfo(this->fullDebugName_) << "Input array time: "
-                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-
-  //should be true
-  return status;
-}
-
-template <typename Client>
-bool TritonClient<Client>::getResults(const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>& results) {
-  bool status = true;
-
-  auto t1 = std::chrono::high_resolution_clock::now();
-  for (const auto& element : results) {
+bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic::InferContext::Result>>& results) {
+  for (auto& element : results) {
     const auto& oname = element.first;
-    const auto& result = element.second;
+    auto& result = element.second;
 
     //check for corresponding entry in output map
     auto itr = this->output_.find(oname);
@@ -242,34 +174,18 @@ bool TritonClient<Client>::getResults(const std::map<std::string, std::unique_pt
       return false;
     }
     auto& output = itr->second;
+    output.set_result(result);
 
-    //shape must be specified for variable dims
+    //set shape here before output becomes const
     if (output.variable_dims()) {
-      status = wrap(result->GetRawShape(&(output.shape())), "getResults(): unable to get output shape");
+      bool status =
+          triton_utils::warn(result->GetRawShape(&(output.shape())), "getResults(): unable to get output shape");
       if (!status)
         return status;
-    }
-    int64_t nOutput = output.size_shape();
-
-    output.vec().resize(nOutput * batchSize_, 0.f);
-    for (unsigned i0 = 0; i0 < batchSize_; i0++) {
-      const uint8_t* r0;
-      size_t content_byte_size;
-      status = wrap(result->GetRaw(i0, &r0, &content_byte_size),
-                    "getResults(): unable to get raw for entry " + std::to_string(i0));
-      if (!status)
-        return status;
-      std::memcpy(&(output.vec()[i0 * nOutput]), r0, nOutput * output.byte_size());
     }
   }
 
-  auto t2 = std::chrono::high_resolution_clock::now();
-  if (!this->debugName_.empty())
-    edm::LogInfo(this->fullDebugName_) << "Output array time: "
-                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-
-  //should be true
-  return status;
+  return true;
 }
 
 //default case for sync and pseudo async
@@ -281,20 +197,13 @@ void TritonClient<Client>::evaluate() {
     return;
   }
 
-  //common operations first
-  bool status = setup();
-  if (!status) {
-    this->finish(false);
-    return;
-  }
-
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();
 
   //blocking call
   auto t1 = std::chrono::high_resolution_clock::now();
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  status = wrap(context_->Run(&results), "evaluate(): unable to run and/or get result");
+  bool status = triton_utils::warn(context_->Run(&results), "evaluate(): unable to run and/or get result");
   if (!status) {
     this->finish(false);
     return;
@@ -326,49 +235,42 @@ void TritonClientAsync::evaluate() {
     return;
   }
 
-  //common operations first
-  bool status = setup();
-  if (!status) {
-    this->finish(false);
-    return;
-  }
-
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();
 
   //non-blocking call
   auto t1 = std::chrono::high_resolution_clock::now();
-  status =
-      wrap(context_->AsyncRun([t1, start_status, this](nic::InferContext* ctx,
-                                                       const std::shared_ptr<nic::InferContext::Request>& request) {
-        //get results
-        bool status = true;
-        std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-        status = wrap(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
-        if (!status) {
-          finish(false);
-          return;
-        }
-        auto t2 = std::chrono::high_resolution_clock::now();
+  bool status = triton_utils::warn(
+      context_->AsyncRun(
+          [t1, start_status, this](nic::InferContext* ctx, const std::shared_ptr<nic::InferContext::Request>& request) {
+            //get results
+            bool status = true;
+            std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+            status = triton_utils::warn(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
+            if (!status) {
+              finish(false);
+              return;
+            }
+            auto t2 = std::chrono::high_resolution_clock::now();
 
-        if (!debugName_.empty())
-          edm::LogInfo(fullDebugName_) << "Remote time: "
-                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+            if (!debugName_.empty())
+              edm::LogInfo(fullDebugName_)
+                  << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
-        const auto& end_status = getServerSideStatus();
+            const auto& end_status = getServerSideStatus();
 
-        if (verbose()) {
-          const auto& stats = summarizeServerStats(start_status, end_status);
-          reportServerSideStats(stats);
-        }
+            if (verbose()) {
+              const auto& stats = summarizeServerStats(start_status, end_status);
+              reportServerSideStats(stats);
+            }
 
-        //check result
-        status = getResults(results);
+            //check result
+            status = getResults(results);
 
-        //finish
-        finish(status);
-      }),
-           "evaluate(): unable to launch async run");
+            //finish
+            finish(status);
+          }),
+      "evaluate(): unable to launch async run");
 
   //if AsyncRun failed, finish() wasn't called
   if (!status)

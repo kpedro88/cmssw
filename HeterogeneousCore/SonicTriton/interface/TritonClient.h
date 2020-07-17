@@ -33,7 +33,7 @@ public:
   TritonClient(const edm::ParameterSet& params);
 
   //helper
-  bool getResults(const std::map<std::string, std::unique_ptr<InferContext::Result>>& results);
+  bool getResults(std::map<std::string, std::unique_ptr<InferContext::Result>>& results);
 
   //accessors
   unsigned batchSize() const { return batchSize_; }
@@ -60,12 +60,6 @@ protected:
   unsigned allowedTries() const override { return allowedTries_; }
 
   void evaluate() override;
-
-  //helper for common ops
-  bool setup();
-
-  //helper to turn triton error into warning
-  bool wrap(const nvidia::inferenceserver::client::Error& err, const std::string& msg, bool stop = false) const;
 
   void reportServerSideStats(const ServerSideStats& stats) const;
   ServerSideStats summarizeServerStats(const ModelStatus& start_status, const ModelStatus& end_status) const;

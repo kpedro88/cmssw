@@ -25,33 +25,41 @@ public:
     // in lieu of random numbers, just increment counters to generate input dimensions
     ++ctr1_;
     if (ctr1_ >= ctr1max_)
-      ctr1_ = 0;
+      ctr1_ = 1;
     ++ctr2_;
     if (ctr2_ >= ctr2max_)
-      ctr2_ = 0;
+      ctr2_ = 1;
 
-    // fill named inputs and set shapes
+    // fill named inputs with proper types and set shapes
     auto& input1 = iInput.at("x__0");
     input1.shape() = {ctr1_, input1.dims()[1]};
-    input1.vec().resize(input1.shape()[0] * input1.shape()[1], 0.5f);
+    std::vector<float> tmp1(input1.shape()[0] * input1.shape()[1], 0.5f);
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.shape() = {input2.dims()[0], ctr2_};
-    input2.vec().resize(input2.shape()[0] * input2.shape()[1], 0);
-    for(int i = 0; i < input2.shape()[0]; ++i){
-      for(int j = 0; j < input2.shape()[1]; ++j){
-        if(i!=j) input2.vec()[input2.shape()[1] * i + j] = 1;
+    std::vector<int64_t> tmp2(input2.shape()[0] * input2.shape()[1], 0);
+    for (int i = 0; i < input2.shape()[0]; ++i) {
+      for (int j = 0; j < input2.shape()[1]; ++j) {
+        if (i != j)
+          tmp2[input2.shape()[1] * i + j] = 1;
       }
     }
+
+    // convert to server format
+    input1.to_server(tmp1);
+    input2.to_server(tmp2);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results
-    const auto& output = iOutput.begin()->second;
+    const auto& output1 = iOutput.begin()->second;
+    std::vector<float> tmp;
+    // convert from server format
+    output1.from_server(tmp);
     std::stringstream msg;
-    for (int i = 0; i < output.shape()[0]; ++i) {
+    for (int i = 0; i < output1.shape()[0]; ++i) {
       msg << "output " << i << ": ";
-      for (int j = 0; j < output.shape()[1]; ++j) {
-        msg << output.vec()[output.shape()[1] * i + j] << " ";
+      for (int j = 0; j < output1.shape()[1]; ++j) {
+        msg << tmp[output1.shape()[1] * i + j] << " ";
       }
       msg << "\n";
     }

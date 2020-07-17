@@ -7,6 +7,7 @@
 #include <numeric>
 #include <functional>
 #include <algorithm>
+#include <memory>
 
 #include "request_grpc.h"
 
@@ -14,25 +15,33 @@
 template <typename IO>
 class TritonData {
 public:
-  //constructor
-  TritonData(std::shared_ptr<IO> data);
+  using Result = nvidia::inferenceserver::client::InferContext::Result;
 
-  //accessors
+  //constructor
+  TritonData(const std::string& name, std::shared_ptr<IO> data);
 
   //dims is fixed by the model info on server, immutable
   const std::vector<int64_t>& dims() const { return dims_; }
 
   //some members can be modified
   std::shared_ptr<IO>& data() { return data_; }
-  std::vector<float>& vec() { return vec_; }
   std::vector<int64_t>& shape() { return shape_; }
   void reset();
+  void set_batch_size(unsigned bsize) { batch_size_ = bsize; }
+  void set_result(std::unique_ptr<Result>& result) { result_ = std::move(result); }
+
+  //io accessors
+  template <typename DT>
+  void to_server(const std::vector<DT>& data_in);
+  template <typename DT>
+  void from_server(std::vector<DT>& data_out) const;
 
   //const accessors
   const std::shared_ptr<IO>& data() const { return data_; }
-  const std::vector<float>& vec() const { return vec_; }
   const std::vector<int64_t>& shape() const { return shape_; }
   int64_t byte_size() const { return byte_size_; }
+  const std::string& dname() const { return dname_; }
+  unsigned batch_size() const { return batch_size_; }
 
   //utilities
   bool variable_dims() const { return variable_dims_; }
@@ -50,13 +59,17 @@ private:
   }
 
   //members
+  std::string name_;
   std::shared_ptr<IO> data_;
   std::vector<int64_t> dims_;
   bool variable_dims_;
   int64_t product_dims_;
+  nvidia::inferenceserver::DataType dtype_;
+  std::string dname_;
   int64_t byte_size_;
-  std::vector<float> vec_;
   std::vector<int64_t> shape_;
+  unsigned batch_size_;
+  std::unique_ptr<Result> result_;
 };
 
 using TritonInputData = TritonData<nvidia::inferenceserver::client::InferContext::Input>;
@@ -65,6 +78,12 @@ using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferContex
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
+template <>
+template <typename DT>
+void TritonInputData::to_server(const std::vector<DT>& data_in);
+template <>
+template <typename DT>
+void TritonOutputData::from_server(std::vector<DT>& data_out) const;
 template <>
 void TritonInputData::reset();
 template <>

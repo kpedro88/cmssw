@@ -52,7 +52,7 @@ public:
       data1_.push_back(randx(rng));
     }
 
-    std::uniform_int_distribution<int> randedge(0, nnodes);
+    std::uniform_int_distribution<int> randedge(0, nnodes-1);
     for(unsigned i = 0; i < input2.size_shape(); ++i){
       data2_.push_back(randedge(rng));
     }

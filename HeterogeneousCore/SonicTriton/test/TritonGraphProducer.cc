@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <random>
 
 template <typename Client>
 class TritonGraphProducer : public SonicEDProducer<Client> {
@@ -17,31 +18,43 @@ public:
   //needed because base class has dependent scope
   using typename SonicEDProducer<Client>::Input;
   using typename SonicEDProducer<Client>::Output;
-  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<Client>(cfg), ctr_(1) {
+  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<Client>(cfg) {
     //for debugging
     this->setDebugName("TritonGraphProducer");
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
-    // in lieu of random numbers, just increment counters to generate input dimensions
-    ++ctr_;
-    if (ctr_ >= ctrMax_)
-      ctr_ = 1;
+    //get event-based seed for RNG
+    unsigned int runNum_uint = static_cast <unsigned int> (iEvent.id().run());
+    unsigned int lumiNum_uint = static_cast <unsigned int> (iEvent.id().luminosityBlock());
+    unsigned int evNum_uint = static_cast <unsigned int> (iEvent.id().event());
+    std::uint32_t seed = (lumiNum_uint<<10) + (runNum_uint<<20) + evNum_uint;
+    std::mt19937 rng(seed);
 
-    // fill named inputs with proper types and set shapes
+    std::uniform_int_distribution<int> randint1(100, 4000);
+    int nnodes = randint1(rng);
+    std::uniform_int_distribution<int> randint2(8000, 15000);
+    int nedges = randint2(rng);
+
+    //set shapes
     auto& input1 = iInput.at("x__0");
-    input1.shape() = {ctr_, input1.dims()[1]};
+    input1.shape() = {nnodes, input1.dims()[1]};
     data1_.clear();
-    data1_.resize(input1.size_shape(), 0.5f);
+    data1_.reserve(input1.size_shape());
 
     auto& input2 = iInput.at("edgeindex__1");
-    input2.shape() = {input2.dims()[0], 2*ctr_};
+    input2.shape() = {input2.dims()[0], nedges};
     data2_.clear();
-    data2_.resize(input2.size_shape(), 0);
-    for (int i = 0; i < input2.shape()[0]; ++i) {
-      for (int j = 0; j < input2.shape()[1]; ++j) {
-        if (i != j)
-          data2_[input2.shape()[1] * i + j] = 1;
-      }
+    data2_.reserve(input2.size_shape());
+
+    //fill
+    std::normal_distribution<float> randx(-10, 4);
+    for(unsigned i = 0; i < input1.size_shape(); ++i){
+      data1_.push_back(randx(rng));
+    }
+
+    std::uniform_int_distribution<int> randedge(0, nnodes);
+    for(unsigned i = 0; i < input2.size_shape(); ++i){
+      data2_.push_back(randedge(rng));
     }
 
     // convert to server format
@@ -76,8 +89,6 @@ public:
 private:
   using SonicEDProducer<Client>::client_;
 
-  static constexpr int ctrMax_ = 10;
-  int ctr_;
   std::vector<float> data1_;
   std::vector<int64_t> data2_;
 };

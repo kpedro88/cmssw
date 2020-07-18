@@ -17,27 +17,24 @@ public:
   //needed because base class has dependent scope
   using typename SonicEDProducer<Client>::Input;
   using typename SonicEDProducer<Client>::Output;
-  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<Client>(cfg), ctr1_(1), ctr2_(1) {
+  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<Client>(cfg), ctr_(1) {
     //for debugging
     this->setDebugName("TritonGraphProducer");
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     // in lieu of random numbers, just increment counters to generate input dimensions
-    ++ctr1_;
-    if (ctr1_ >= ctr1max_)
-      ctr1_ = 1;
-    ++ctr2_;
-    if (ctr2_ >= ctr2max_)
-      ctr2_ = 1;
+    ++ctr_;
+    if (ctr_ >= ctrMax_)
+      ctr_ = 1;
 
     // fill named inputs with proper types and set shapes
     auto& input1 = iInput.at("x__0");
-    input1.shape() = {ctr1_, input1.dims()[1]};
+    input1.shape() = {ctr_, input1.dims()[1]};
     data1_.clear();
     data1_.resize(input1.size_shape(), 0.5f);
 
     auto& input2 = iInput.at("edgeindex__1");
-    input2.shape() = {input2.dims()[0], ctr2_};
+    input2.shape() = {input2.dims()[0], 2*ctr_};
     data2_.clear();
     data2_.resize(input2.size_shape(), 0);
     for (int i = 0; i < input2.shape()[0]; ++i) {
@@ -79,8 +76,8 @@ public:
 private:
   using SonicEDProducer<Client>::client_;
 
-  static constexpr int ctr1max_ = 5, ctr2max_ = 10;
-  int ctr1_, ctr2_;
+  static constexpr int ctrMax_ = 10;
+  int ctr_;
   std::vector<float> data1_;
   std::vector<int64_t> data2_;
 };

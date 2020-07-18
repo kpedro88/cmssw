@@ -128,7 +128,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
 
 template <typename Client>
 bool TritonClient<Client>::setBatchSize(unsigned bsize) {
-  if (batchSize_ > maxBatchSize_) {
+  if (bsize > maxBatchSize_) {
     edm::LogWarning(this->fullDebugName_)
         << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_
         << ". Batch size will remain as" << batchSize_;

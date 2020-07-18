@@ -13,7 +13,7 @@ std::string print_vec(const std::vector<T>& vec, const std::string& delim) {
     return "";
   std::stringstream msg;
   //avoid trailing delim
-  std::copy(vec.begin(), vec.end() - 1, std::ostream_iterator<int64_t>(msg, delim.c_str()));
+  std::copy(vec.begin(), vec.end() - 1, std::ostream_iterator<T>(msg, delim.c_str()));
   //last element
   msg << vec.back();
   return msg.str();
@@ -33,4 +33,6 @@ bool warn(const Error& err, const std::string& msg) {
 }
 
 template std::string triton_utils::print_vec(const std::vector<int64_t>& vec, const std::string& delim);
+template std::string triton_utils::print_vec(const std::vector<uint8_t>& vec, const std::string& delim);
+template std::string triton_utils::print_vec(const std::vector<float>& vec, const std::string& delim);
 

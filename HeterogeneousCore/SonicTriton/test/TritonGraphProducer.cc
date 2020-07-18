@@ -33,21 +33,23 @@ public:
     // fill named inputs with proper types and set shapes
     auto& input1 = iInput.at("x__0");
     input1.shape() = {ctr1_, input1.dims()[1]};
-    std::vector<float> tmp1(input1.shape()[0] * input1.shape()[1], 0.5f);
+    data1_.clear();
+    data1_.resize(input1.size_shape(), 0.5f);
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.shape() = {input2.dims()[0], ctr2_};
-    std::vector<int64_t> tmp2(input2.shape()[0] * input2.shape()[1], 0);
+    data2_.clear();
+    data2_.resize(input2.size_shape(), 0);
     for (int i = 0; i < input2.shape()[0]; ++i) {
       for (int j = 0; j < input2.shape()[1]; ++j) {
         if (i != j)
-          tmp2[input2.shape()[1] * i + j] = 1;
+          data2_[input2.shape()[1] * i + j] = 1;
       }
     }
 
     // convert to server format
-    input1.to_server(tmp1);
-    input2.to_server(tmp2);
+    input1.to_server(data1_);
+    input2.to_server(data2_);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results
@@ -79,6 +81,8 @@ private:
 
   static constexpr int ctr1max_ = 5, ctr2max_ = 10;
   int ctr1_, ctr2_;
+  std::vector<float> data1_;
+  std::vector<int64_t> data2_;
 };
 
 using TritonGraphProducerSync = TritonGraphProducer<TritonClientSync>;

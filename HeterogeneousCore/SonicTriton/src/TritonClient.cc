@@ -174,7 +174,6 @@ bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic:
       return false;
     }
     auto& output = itr->second;
-    output.set_result(result);
 
     //set shape here before output becomes const
     if (output.variable_dims()) {
@@ -183,6 +182,9 @@ bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic:
       if (!status)
         return status;
     }
+    //transfer ownership
+    output.set_result(result);
+
   }
 
   return true;

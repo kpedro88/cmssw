@@ -183,7 +183,7 @@ bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic:
         return status;
     }
     //transfer ownership
-    output.set_result(result);
+    output.set_result(std::move(result));
 
   }
 

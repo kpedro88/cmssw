@@ -28,11 +28,11 @@ public:
   std::vector<int64_t>& shape() { return shape_; }
   void reset();
   void set_batch_size(unsigned bsize) { batch_size_ = bsize; }
-  void set_result(std::unique_ptr<Result>& result) { result_ = std::move(result); }
+  void set_result(std::unique_ptr<Result> result) { result_ = std::move(result); }
 
   //io accessors
   template <typename DT>
-  void to_server(const std::vector<DT>& data_in);
+  void to_server(std::shared_ptr<std::vector<DT>> ptr);
   template <typename DT>
   void from_server(std::vector<DT>& data_out) const;
 
@@ -69,6 +69,7 @@ private:
   int64_t byte_size_;
   std::vector<int64_t> shape_;
   unsigned batch_size_;
+  std::function<void(void)> callback_;
   std::unique_ptr<Result> result_;
 };
 
@@ -80,7 +81,7 @@ using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 //avoid "explicit specialization after instantiation" error
 template <>
 template <typename DT>
-void TritonInputData::to_server(const std::vector<DT>& data_in);
+void TritonInputData::to_server(std::shared_ptr<std::vector<DT>> data_in);
 template <>
 template <typename DT>
 void TritonOutputData::from_server(std::vector<DT>& data_out) const;

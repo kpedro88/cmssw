@@ -38,28 +38,28 @@ public:
     //set shapes
     auto& input1 = iInput.at("x__0");
     input1.shape() = {nnodes, input1.dims()[1]};
-    data1_.clear();
-    data1_.reserve(input1.size_shape());
+    auto data1 = std::make_shared<std::vector<float>>();
+    data1->reserve(input1.size_shape());
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.shape() = {input2.dims()[0], nedges};
-    data2_.clear();
-    data2_.reserve(input2.size_shape());
+    auto data2 = std::make_shared<std::vector<int64_t>>();
+    data2->reserve(input2.size_shape());
 
     //fill
     std::normal_distribution<float> randx(-10, 4);
     for(unsigned i = 0; i < input1.size_shape(); ++i){
-      data1_.push_back(randx(rng));
+      data1->push_back(randx(rng));
     }
 
     std::uniform_int_distribution<int> randedge(0, nnodes-1);
     for(unsigned i = 0; i < input2.size_shape(); ++i){
-      data2_.push_back(randedge(rng));
+      data2->push_back(randedge(rng));
     }
 
     // convert to server format
-    input1.to_server(data1_);
-    input2.to_server(data2_);
+    input1.to_server(data1);
+    input2.to_server(data2);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results

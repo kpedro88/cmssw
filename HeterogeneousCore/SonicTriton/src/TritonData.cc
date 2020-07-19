@@ -39,7 +39,7 @@ TritonData<IO>::TritonData(const std::string& name, std::shared_ptr<IO> data)
 //io accessors
 template <typename IO>
 template <typename DT>
-void TritonData<IO>::to_server(const std::vector<DT>& data_in) {}
+void TritonData<IO>::to_server(std::shared_ptr<std::vector<DT>> ptr) {}
 
 template <typename IO>
 template <typename DT>
@@ -47,7 +47,9 @@ void TritonData<IO>::from_server(std::vector<DT>& data_in) const {}
 
 template <>
 template <typename DT>
-void TritonInputData::to_server(const std::vector<DT>& data_in) {
+void TritonInputData::to_server(std::shared_ptr<std::vector<DT>> ptr) {
+  const auto& data_in = *(ptr.get());
+
   //shape must be specified for variable dims
   if (variable_dims_) {
     if (shape_.size() != dims_.size()) {
@@ -69,6 +71,9 @@ void TritonInputData::to_server(const std::vector<DT>& data_in) {
     triton_utils::wrap(data_->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * byte_size_),
                        name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
   }
+
+  //keep input data in scope
+  callback_ = [ptr]() { return; };
 }
 
 template <>
@@ -107,6 +112,7 @@ template <>
 void TritonInputData::reset() {
   shape_.clear();
   data_->Reset();
+  if(callback_) callback_();
 }
 
 template <>
@@ -119,7 +125,7 @@ void TritonOutputData::reset() {
 template class TritonData<nic::InferContext::Input>;
 template class TritonData<nic::InferContext::Output>;
 
-template void TritonInputData::to_server(const std::vector<float>& data_in);
-template void TritonInputData::to_server(const std::vector<int64_t>& data_in);
+template void TritonInputData::to_server(std::shared_ptr<std::vector<float>> data_in);
+template void TritonInputData::to_server(std::shared_ptr<std::vector<int64_t>> data_in);
 
 template void TritonOutputData::from_server(std::vector<float>& data_out) const;

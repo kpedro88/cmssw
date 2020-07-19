@@ -37,10 +37,9 @@ public:
     // create an npix x npix x ncol image w/ arbitrary color value
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
-    data1_.clear();
-    data1_.resize(input1.size_dims() * input1.batch_size(), 0.5f);
+    auto data1 = std::make_shared<std::vector<float>>(input1.size_dims() * input1.batch_size(), 0.5f);
     // convert to server format
-    input1.to_server(data1_);
+    input1.to_server(data1);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     // check the results
@@ -85,7 +84,6 @@ private:
 
   unsigned topN_;
   std::vector<std::string> imageList_;
-  std::vector<float> data1_;
 };
 
 using TritonImageProducerSync = TritonImageProducer<TritonClientSync>;

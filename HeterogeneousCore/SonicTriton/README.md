@@ -1,6 +1,6 @@
 # SONIC for Triton Inference Server
 
-Triton Inference Server ([docs](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html), [repo](https://github.com/NVIDIA/triton-inference-server))
+Triton Inference Server ([docs](https://docs.nvidia.com/deeplearning/triton-inference-server/archives/triton_inference_server_1130/user-guide/docs/index.html), [repo](https://github.com/NVIDIA/triton-inference-server))
 is an open-source product from Nvidia that facilitates the use of GPUs as a service to process inference requests.
 
 Triton supports multiple named inputs and outputs with different types. The allowed types are:

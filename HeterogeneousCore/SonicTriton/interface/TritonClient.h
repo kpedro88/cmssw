@@ -39,18 +39,7 @@ public:
   void reset() override;
 
   //for fillDescriptions
-  static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {
-    edm::ParameterSetDescription descClient(basePSetDescription());
-    descClient.add<std::string>("modelName");
-    descClient.add<int>("modelVersion", -1);
-    //server parameters should not affect the physics results
-    descClient.addUntracked<unsigned>("batchSize");
-    descClient.addUntracked<std::string>("address");
-    descClient.addUntracked<unsigned>("port");
-    descClient.addUntracked<unsigned>("timeout");
-    descClient.addUntracked<bool>("verbose", false);
-    iDesc.add<edm::ParameterSetDescription>("Client", descClient);
-  }
+  static void fillPSetDescription(edm::ParameterSetDescription& iDesc);
 
 protected:
   void evaluate() override;

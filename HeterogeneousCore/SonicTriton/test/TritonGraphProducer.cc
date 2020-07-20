@@ -20,10 +20,10 @@ public:
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     //get event-based seed for RNG
-    unsigned int runNum_uint = static_cast <unsigned int> (iEvent.id().run());
-    unsigned int lumiNum_uint = static_cast <unsigned int> (iEvent.id().luminosityBlock());
-    unsigned int evNum_uint = static_cast <unsigned int> (iEvent.id().event());
-    std::uint32_t seed = (lumiNum_uint<<10) + (runNum_uint<<20) + evNum_uint;
+    unsigned int runNum_uint = static_cast<unsigned int>(iEvent.id().run());
+    unsigned int lumiNum_uint = static_cast<unsigned int>(iEvent.id().luminosityBlock());
+    unsigned int evNum_uint = static_cast<unsigned int>(iEvent.id().event());
+    std::uint32_t seed = (lumiNum_uint << 10) + (runNum_uint << 20) + evNum_uint;
     std::mt19937 rng(seed);
 
     std::uniform_int_distribution<int> randint1(100, 4000);
@@ -44,12 +44,12 @@ public:
 
     //fill
     std::normal_distribution<float> randx(-10, 4);
-    for(unsigned i = 0; i < input1.sizeShape(); ++i){
+    for (unsigned i = 0; i < input1.sizeShape(); ++i) {
       data1->push_back(randx(rng));
     }
 
-    std::uniform_int_distribution<int> randedge(0, nnodes-1);
-    for(unsigned i = 0; i < input2.sizeShape(); ++i){
+    std::uniform_int_distribution<int> randedge(0, nnodes - 1);
+    for (unsigned i = 0; i < input2.sizeShape(); ++i) {
       data2->push_back(randedge(rng));
     }
 

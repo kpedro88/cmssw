@@ -32,11 +32,11 @@ TritonClient::TritonClient(const edm::ParameterSet& params)
 
   //connect to the server
   TritonUtils::wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
-                     "TritonClient(): unable to create inference context");
+                    "TritonClient(): unable to create inference context");
 
   //get options
   TritonUtils::wrap(nic::InferContext::Options::Create(&options_),
-                     "TritonClient(): unable to create inference context options");
+                    "TritonClient(): unable to create inference context options");
 
   //get input and output (which know their sizes)
   const auto& nicInputs = context_->Inputs();
@@ -65,8 +65,8 @@ TritonClient::TritonClient(const edm::ParameterSet& params)
            << "\n";
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput->Name();
-    const auto& curr_itr = input_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput));
+    const auto& curr_itr =
+        input_.emplace(std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput));
     if (verbose_) {
       const auto& curr_input = curr_itr.first->second;
       io_msg << "  " << iname << " (" << curr_input.dname() << ", " << curr_input.byteSize()
@@ -84,7 +84,7 @@ TritonClient::TritonClient(const edm::ParameterSet& params)
         std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput));
     const auto& curr_output = curr_itr.first->second;
     TritonUtils::wrap(options_->AddRawResult(curr_output.data()),
-                       "TritonClient(): unable to add raw result " + curr_itr.first->first);
+                      "TritonClient(): unable to add raw result " + curr_itr.first->first);
     if (verbose_) {
       io_msg << "  " << oname << " (" << curr_output.dname() << ", " << curr_output.byteSize()
              << " b) : " << TritonUtils::printVec(curr_output.dims()) << "\n";
@@ -119,7 +119,7 @@ TritonClient::TritonClient(const edm::ParameterSet& params)
     edm::LogInfo(fullDebugName_) << model_msg.str() << io_msg.str();
 
     has_server = TritonUtils::warn(nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false),
-                                    "TritonClient(): unable to create server context");
+                                   "TritonClient(): unable to create server context");
   }
   if (!has_server)
     serverCtx_ = nullptr;
@@ -127,9 +127,8 @@ TritonClient::TritonClient(const edm::ParameterSet& params)
 
 bool TritonClient::setBatchSize(unsigned bsize) {
   if (bsize > maxBatchSize_) {
-    edm::LogWarning(fullDebugName_)
-        << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_
-        << ". Batch size will remain as" << batchSize_;
+    edm::LogWarning(fullDebugName_) << "Requested batch size " << bsize << " exceeds server-specified max batch size "
+                                    << maxBatchSize_ << ". Batch size will remain as" << batchSize_;
     return false;
   } else {
     batchSize_ = bsize;
@@ -180,7 +179,6 @@ bool TritonClient::getResults(std::map<std::string, std::unique_ptr<nic::InferCo
     }
     //transfer ownership
     output.setResult(std::move(result));
-
   }
 
   return true;
@@ -197,70 +195,69 @@ void TritonClient::evaluate() {
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();
 
-  if(mode_==SonicMode::Async){
-  //non-blocking call
-  auto t1 = std::chrono::high_resolution_clock::now();
-  bool status = TritonUtils::warn(
-      context_->AsyncRun(
-          [t1, start_status, this](nic::InferContext* ctx, const std::shared_ptr<nic::InferContext::Request>& request) {
-            //get results
-            bool status = true;
-            std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-            status = TritonUtils::warn(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
-            if (!status) {
-              finish(false);
-              return;
-            }
-            auto t2 = std::chrono::high_resolution_clock::now();
+  if (mode_ == SonicMode::Async) {
+    //non-blocking call
+    auto t1 = std::chrono::high_resolution_clock::now();
+    bool status = TritonUtils::warn(
+        context_->AsyncRun([t1, start_status, this](nic::InferContext* ctx,
+                                                    const std::shared_ptr<nic::InferContext::Request>& request) {
+          //get results
+          bool status = true;
+          std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+          status = TritonUtils::warn(ctx->GetAsyncRunResults(request, &results), "evaluate(): unable to get result");
+          if (!status) {
+            finish(false);
+            return;
+          }
+          auto t2 = std::chrono::high_resolution_clock::now();
 
-            if (!debugName_.empty())
-              edm::LogInfo(fullDebugName_)
-                  << "Remote time: " << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+          if (!debugName_.empty())
+            edm::LogInfo(fullDebugName_) << "Remote time: "
+                                         << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
-            const auto& end_status = getServerSideStatus();
+          const auto& end_status = getServerSideStatus();
 
-            if (verbose()) {
-              const auto& stats = summarizeServerStats(start_status, end_status);
-              reportServerSideStats(stats);
-            }
+          if (verbose()) {
+            const auto& stats = summarizeServerStats(start_status, end_status);
+            reportServerSideStats(stats);
+          }
 
-            //check result
-            status = getResults(results);
+          //check result
+          status = getResults(results);
 
-            //finish
-            finish(status);
-          }),
-      "evaluate(): unable to launch async run");
+          //finish
+          finish(status);
+        }),
+        "evaluate(): unable to launch async run");
 
-  //if AsyncRun failed, finish() wasn't called
-  if (!status)
-    finish(false);
-  }
-  else {
-  //blocking call
-  auto t1 = std::chrono::high_resolution_clock::now();
-  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  bool status = TritonUtils::warn(context_->Run(&results), "evaluate(): unable to run and/or get result");
-  if (!status) {
-    finish(false);
-    return;
-  }
+    //if AsyncRun failed, finish() wasn't called
+    if (!status)
+      finish(false);
+  } else {
+    //blocking call
+    auto t1 = std::chrono::high_resolution_clock::now();
+    std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+    bool status = TritonUtils::warn(context_->Run(&results), "evaluate(): unable to run and/or get result");
+    if (!status) {
+      finish(false);
+      return;
+    }
 
-  auto t2 = std::chrono::high_resolution_clock::now();
-  if (!debugName_.empty())
-    edm::LogInfo(fullDebugName_) << "Remote time: "
-                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+    auto t2 = std::chrono::high_resolution_clock::now();
+    if (!debugName_.empty())
+      edm::LogInfo(fullDebugName_) << "Remote time: "
+                                   << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 
-  const auto& end_status = getServerSideStatus();
+    const auto& end_status = getServerSideStatus();
 
-  if (verbose()) {
-    const auto& stats = summarizeServerStats(start_status, end_status);
-    reportServerSideStats(stats);
-  }
+    if (verbose()) {
+      const auto& stats = summarizeServerStats(start_status, end_status);
+      reportServerSideStats(stats);
+    }
 
-  status = getResults(results);
+    status = getResults(results);
 
-  finish(status);
+    finish(status);
   }
 }
 
@@ -295,8 +292,8 @@ void TritonClient::reportServerSideStats(const TritonClient::ServerSideStats& st
     edm::LogInfo(fullDebugName_) << msg.str();
 }
 
-TritonClient::ServerSideStats TritonClient::summarizeServerStats(
-    const ni::ModelStatus& start_status, const ni::ModelStatus& end_status) const {
+TritonClient::ServerSideStats TritonClient::summarizeServerStats(const ni::ModelStatus& start_status,
+                                                                 const ni::ModelStatus& end_status) const {
   // If model_version is -1 then look in the end status to find the
   // latest (highest valued version) and use that as the version.
   int64_t status_model_version = 0;

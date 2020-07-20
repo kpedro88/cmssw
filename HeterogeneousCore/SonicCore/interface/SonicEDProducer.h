@@ -44,8 +44,9 @@ public:
     //measure time between acquire and produce
     auto t_finish = std::chrono::high_resolution_clock::now();
     if (!client_.debugName().empty())
-      edm::LogInfo(client_.debugName()) << "dispatch() time: "
-                                        << std::chrono::duration_cast<std::chrono::microseconds>(t_finish - t_dispatch_).count();
+      edm::LogInfo(client_.debugName())
+          << "dispatch() time: "
+          << std::chrono::duration_cast<std::chrono::microseconds>(t_finish - t_dispatch_).count();
     auto t0 = std::chrono::high_resolution_clock::now();
     produce(iEvent, iSetup, client_.output());
     auto t1 = std::chrono::high_resolution_clock::now();

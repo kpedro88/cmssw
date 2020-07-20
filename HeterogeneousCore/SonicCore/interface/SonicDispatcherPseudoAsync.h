@@ -34,5 +34,5 @@ private:
   std::atomic<bool> stop_;
   std::unique_ptr<std::thread> thread_;
 };
-  
+
 #endif

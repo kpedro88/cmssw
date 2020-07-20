@@ -61,7 +61,7 @@ void TritonInputData::toServer(std::shared_ptr<std::vector<DT>> ptr) {
   for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
     const DT* arr = &(data_in[i0 * nInput]);
     TritonUtils::wrap(data_->SetRaw(reinterpret_cast<const uint8_t*>(arr), nInput * byteSize_),
-                       name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
+                      name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
   }
 
   //keep input data in scope
@@ -95,7 +95,7 @@ void TritonOutputData::fromServer(std::vector<DT>& dataOut) const {
     const uint8_t* r0;
     size_t contentByteSize;
     TritonUtils::wrap(result_->GetRaw(i0, &r0, &contentByteSize),
-                       "output(): unable to get raw for entry " + std::to_string(i0));
+                      "output(): unable to get raw for entry " + std::to_string(i0));
     std::memcpy(&(dataOut[i0 * nOutput]), r0, nOutput * byteSize_);
   }
 }
@@ -104,7 +104,8 @@ template <>
 void TritonInputData::reset() {
   shape_.clear();
   data_->Reset();
-  if(callback_) callback_();
+  if (callback_)
+    callback_();
 }
 
 template <>

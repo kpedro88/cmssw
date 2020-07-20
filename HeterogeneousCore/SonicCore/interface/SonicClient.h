@@ -9,10 +9,7 @@ template <typename InputT, typename OutputT = InputT>
 class SonicClient : public SonicClientBase, public SonicClientTypes<InputT, OutputT> {
 public:
   //constructor
-  SonicClient(const edm::ParameterSet& params) :
-    SonicClientBase(params),
-    SonicClientTypes<InputT, OutputT>()
-  {}
+  SonicClient(const edm::ParameterSet& params) : SonicClientBase(params), SonicClientTypes<InputT, OutputT>() {}
 
   //do nothing by default
   void reset() override {}

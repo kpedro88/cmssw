@@ -13,11 +13,7 @@
 #include <exception>
 #include <memory>
 
-enum class SonicMode {
-  Sync = 1,
-  Async = 2,
-  PseudoAsync = 3
-};
+enum class SonicMode { Sync = 1, Async = 2, PseudoAsync = 3 };
 
 class SonicClientBase {
 public:
@@ -38,7 +34,7 @@ public:
   virtual void reset() = 0;
 
   //provide base params
-  static edm::ParameterSetDescription basePSetDescription(bool allowRetry=true);
+  static edm::ParameterSetDescription basePSetDescription(bool allowRetry = true);
 
 protected:
   virtual void evaluate() = 0;

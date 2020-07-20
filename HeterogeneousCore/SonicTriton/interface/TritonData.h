@@ -27,34 +27,34 @@ public:
   std::shared_ptr<IO>& data() { return data_; }
   std::vector<int64_t>& shape() { return shape_; }
   void reset();
-  void set_batch_size(unsigned bsize) { batch_size_ = bsize; }
-  void set_result(std::unique_ptr<Result> result) { result_ = std::move(result); }
+  void setBatchSize(unsigned bsize) { batchSize_ = bsize; }
+  void setResult(std::unique_ptr<Result> result) { result_ = std::move(result); }
 
   //io accessors
   template <typename DT>
-  void to_server(std::shared_ptr<std::vector<DT>> ptr);
+  void toServer(std::shared_ptr<std::vector<DT>> ptr);
   template <typename DT>
-  void from_server(std::vector<DT>& data_out) const;
+  void fromServer(std::vector<DT>& data_out) const;
 
   //const accessors
   const std::shared_ptr<IO>& data() const { return data_; }
   const std::vector<int64_t>& shape() const { return shape_; }
-  int64_t byte_size() const { return byte_size_; }
+  int64_t byteSize() const { return byteSize_; }
   const std::string& dname() const { return dname_; }
-  unsigned batch_size() const { return batch_size_; }
+  unsigned batchSize() const { return batchSize_; }
 
   //utilities
-  bool variable_dims() const { return variable_dims_; }
-  int64_t size_dims() const { return product_dims_; }
+  bool variableDims() const { return variableDims_; }
+  int64_t sizeDims() const { return productDims_; }
   //default to dims if shape isn't filled
-  int64_t size_shape() const { return shape_.empty() ? size_dims() : dim_product(shape_); }
+  int64_t sizeShape() const { return shape_.empty() ? sizeDims() : dimProduct(shape_); }
 
 private:
   //helpers
-  bool any_neg(const std::vector<int64_t>& vec) const {
+  bool anyNeg(const std::vector<int64_t>& vec) const {
     return std::any_of(vec.begin(), vec.end(), [](int64_t i) { return i < 0; });
   }
-  int64_t dim_product(const std::vector<int64_t>& vec) const {
+  int64_t dimProduct(const std::vector<int64_t>& vec) const {
     return std::accumulate(vec.begin(), vec.end(), 1, std::multiplies<int64_t>());
   }
 
@@ -62,13 +62,13 @@ private:
   std::string name_;
   std::shared_ptr<IO> data_;
   std::vector<int64_t> dims_;
-  bool variable_dims_;
-  int64_t product_dims_;
+  bool variableDims_;
+  int64_t productDims_;
   nvidia::inferenceserver::DataType dtype_;
   std::string dname_;
-  int64_t byte_size_;
+  int64_t byteSize_;
   std::vector<int64_t> shape_;
-  unsigned batch_size_;
+  unsigned batchSize_;
   std::function<void(void)> callback_;
   std::unique_ptr<Result> result_;
 };
@@ -78,13 +78,21 @@ using TritonInputMap = std::unordered_map<std::string, TritonInputData>;
 using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferContext::Output>;
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
+//delete functions that don't make sense
+template <>
+template <typename DT>
+void TritonInputData::fromServer(std::vector<DT>& dataOut) const = delete;
+template <>
+template <typename DT>
+void TritonOutputData::toServer(std::shared_ptr<std::vector<DT>> ptr) = delete;
+
 //avoid "explicit specialization after instantiation" error
 template <>
 template <typename DT>
-void TritonInputData::to_server(std::shared_ptr<std::vector<DT>> data_in);
+void TritonInputData::toServer(std::shared_ptr<std::vector<DT>> ptr);
 template <>
 template <typename DT>
-void TritonOutputData::from_server(std::vector<DT>& data_out) const;
+void TritonOutputData::fromServer(std::vector<DT>& dataOut) const;
 template <>
 void TritonInputData::reset();
 template <>

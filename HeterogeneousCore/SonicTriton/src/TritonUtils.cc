@@ -5,10 +5,10 @@
 #include <sstream>
 #include <iterator>
 
-namespace triton_utils {
+namespace TritonUtils {
 
 template <typename T>
-std::string print_vec(const std::vector<T>& vec, const std::string& delim) {
+std::string printVec(const std::vector<T>& vec, const std::string& delim) {
   if (vec.empty())
     return "";
   std::stringstream msg;
@@ -32,7 +32,7 @@ bool warn(const Error& err, const std::string& msg) {
 
 }
 
-template std::string triton_utils::print_vec(const std::vector<int64_t>& vec, const std::string& delim);
-template std::string triton_utils::print_vec(const std::vector<uint8_t>& vec, const std::string& delim);
-template std::string triton_utils::print_vec(const std::vector<float>& vec, const std::string& delim);
+template std::string TritonUtils::printVec(const std::vector<int64_t>& vec, const std::string& delim);
+template std::string TritonUtils::printVec(const std::vector<uint8_t>& vec, const std::string& delim);
+template std::string TritonUtils::printVec(const std::vector<float>& vec, const std::string& delim);
 

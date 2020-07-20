@@ -35,34 +35,34 @@ public:
     auto& input1 = iInput.at("x__0");
     input1.shape() = {nnodes, input1.dims()[1]};
     auto data1 = std::make_shared<std::vector<float>>();
-    data1->reserve(input1.size_shape());
+    data1->reserve(input1.sizeShape());
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.shape() = {input2.dims()[0], nedges};
     auto data2 = std::make_shared<std::vector<int64_t>>();
-    data2->reserve(input2.size_shape());
+    data2->reserve(input2.sizeShape());
 
     //fill
     std::normal_distribution<float> randx(-10, 4);
-    for(unsigned i = 0; i < input1.size_shape(); ++i){
+    for(unsigned i = 0; i < input1.sizeShape(); ++i){
       data1->push_back(randx(rng));
     }
 
     std::uniform_int_distribution<int> randedge(0, nnodes-1);
-    for(unsigned i = 0; i < input2.size_shape(); ++i){
+    for(unsigned i = 0; i < input2.sizeShape(); ++i){
       data2->push_back(randedge(rng));
     }
 
     // convert to server format
-    input1.to_server(data1);
-    input2.to_server(data2);
+    input1.toServer(data1);
+    input2.toServer(data2);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     //check the results
     const auto& output1 = iOutput.begin()->second;
     std::vector<float> tmp;
     // convert from server format
-    output1.from_server(tmp);
+    output1.fromServer(tmp);
     std::stringstream msg;
     for (int i = 0; i < output1.shape()[0]; ++i) {
       msg << "output " << i << ": ";

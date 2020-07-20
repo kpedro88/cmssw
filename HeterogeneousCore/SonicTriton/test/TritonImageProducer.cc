@@ -33,9 +33,9 @@ public:
     // create an npix x npix x ncol image w/ arbitrary color value
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
-    auto data1 = std::make_shared<std::vector<float>>(input1.size_dims() * input1.batch_size(), 0.5f);
+    auto data1 = std::make_shared<std::vector<float>>(input1.sizeDims() * input1.batchSize(), 0.5f);
     // convert to server format
-    input1.to_server(data1);
+    input1.toServer(data1);
   }
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
     // check the results
@@ -55,9 +55,9 @@ public:
 private:
   void findTopN(const TritonOutputData& scores, unsigned n = 5) const {
     std::vector<float> tmp;
-    scores.from_server(tmp);
-    auto dim = scores.size_dims();
-    for (unsigned i0 = 0; i0 < scores.batch_size(); i0++) {
+    scores.fromServer(tmp);
+    auto dim = scores.sizeDims();
+    for (unsigned i0 = 0; i0 < scores.batchSize(); i0++) {
       //match score to type by index, then put in largest-first map
       std::map<float, std::string, std::greater<float>> score_map;
       for (unsigned i = 0; i < std::min((unsigned)dim, (unsigned)imageList_.size()); ++i) {

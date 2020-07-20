@@ -1,6 +1,8 @@
 #ifndef HeterogeneousCore_SonicTriton_TritonData
 #define HeterogeneousCore_SonicTriton_TritonData
 
+#include "FWCore/Utilities/interface/Exception.h"
+
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -28,9 +30,9 @@ public:
 
   //io accessors
   template <typename DT>
-  void toServer(std::shared_ptr<std::vector<DT>> ptr);
+  void toServer(std::shared_ptr<std::vector<DT>> ptr) { throw cms::Exception("UnimplementedError"); }
   template <typename DT>
-  void fromServer(std::vector<DT>& data_out) const;
+  void fromServer(std::vector<DT>& data_out) const { throw cms::Exception("UnimplementedError"); }
 
   //const accessors
   const std::shared_ptr<IO>& data() const { return data_; }
@@ -74,14 +76,6 @@ using TritonInputData = TritonData<nvidia::inferenceserver::client::InferContext
 using TritonInputMap = std::unordered_map<std::string, TritonInputData>;
 using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferContext::Output>;
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
-
-//delete functions that don't make sense
-template <>
-template <typename DT>
-void TritonInputData::fromServer(std::vector<DT>& dataOut) const = delete;
-template <>
-template <typename DT>
-void TritonOutputData::toServer(std::shared_ptr<std::vector<DT>> ptr) = delete;
 
 //avoid "explicit specialization after instantiation" error
 template <>

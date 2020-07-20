@@ -3,9 +3,7 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include "HeterogeneousCore/SonicCore/interface/SonicClientSync.h"
-#include "HeterogeneousCore/SonicCore/interface/SonicClientPseudoAsync.h"
-#include "HeterogeneousCore/SonicCore/interface/SonicClientAsync.h"
+#include "HeterogeneousCore/SonicCore/interface/SonicClient.h"
 #include "HeterogeneousCore/SonicTriton/interface/TritonData.h"
 
 #include <map>
@@ -16,8 +14,7 @@
 
 #include "request_grpc.h"
 
-template <typename Client>
-class TritonClient : public Client {
+class TritonClient : public SonicClient<TritonInputMap, TritonOutputMap> {
 public:
   using ModelStatus = nvidia::inferenceserver::ModelStatus;
   using InferContext = nvidia::inferenceserver::client::InferContext;
@@ -43,7 +40,7 @@ public:
 
   //for fillDescriptions
   static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {
-    edm::ParameterSetDescription descClient;
+    edm::ParameterSetDescription descClient(basePSetDescription());
     descClient.add<std::string>("modelName");
     descClient.add<int>("modelVersion", -1);
     //server parameters should not affect the physics results
@@ -52,13 +49,10 @@ public:
     descClient.addUntracked<unsigned>("port");
     descClient.addUntracked<unsigned>("timeout");
     descClient.addUntracked<bool>("verbose", false);
-    descClient.addUntracked<unsigned>("allowedTries", 0);
     iDesc.add<edm::ParameterSetDescription>("Client", descClient);
   }
 
 protected:
-  unsigned allowedTries() const override { return allowedTries_; }
-
   void evaluate() override;
 
   void reportServerSideStats(const ServerSideStats& stats) const;
@@ -75,24 +69,10 @@ protected:
   unsigned batchSize_;
   bool noBatch_;
   bool verbose_;
-  unsigned allowedTries_;
 
   std::unique_ptr<InferContext> context_;
   std::unique_ptr<nvidia::inferenceserver::client::ServerStatusContext> serverCtx_;
   std::unique_ptr<InferContext::Options> options_;
 };
-
-using TritonClientSync = TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
-using TritonClientPseudoAsync = TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;
-using TritonClientAsync = TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
-
-//avoid "explicit specialization after instantiation" error
-template <>
-void TritonClientAsync::evaluate();
-
-//explicit template instantiation declarations
-extern template class TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
-extern template class TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
-extern template class TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;
 
 #endif

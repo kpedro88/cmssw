@@ -12,15 +12,11 @@
 #include <map>
 #include <random>
 
-template <typename Client>
-class TritonGraphProducer : public SonicEDProducer<Client> {
+class TritonGraphProducer : public SonicEDProducer<TritonClient> {
 public:
-  //needed because base class has dependent scope
-  using typename SonicEDProducer<Client>::Input;
-  using typename SonicEDProducer<Client>::Output;
-  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<Client>(cfg) {
+  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : SonicEDProducer<TritonClient>(cfg) {
     //for debugging
-    this->setDebugName("TritonGraphProducer");
+    setDebugName("TritonGraphProducer");
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     //get event-based seed for RNG
@@ -81,22 +77,14 @@ public:
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
     edm::ParameterSetDescription desc;
-    Client::fillPSetDescription(desc);
+    TritonClient::fillPSetDescription(desc);
     //to ensure distinct cfi names
     descriptions.addWithDefaultLabel(desc);
   }
 
 private:
-  using SonicEDProducer<Client>::client_;
-
   std::vector<float> data1_;
   std::vector<int64_t> data2_;
 };
 
-using TritonGraphProducerSync = TritonGraphProducer<TritonClientSync>;
-using TritonGraphProducerAsync = TritonGraphProducer<TritonClientAsync>;
-using TritonGraphProducerPseudoAsync = TritonGraphProducer<TritonClientPseudoAsync>;
-
-DEFINE_FWK_MODULE(TritonGraphProducerSync);
-DEFINE_FWK_MODULE(TritonGraphProducerAsync);
-DEFINE_FWK_MODULE(TritonGraphProducerPseudoAsync);
+DEFINE_FWK_MODULE(TritonGraphProducer);

@@ -32,19 +32,15 @@ models = {
 if options.producer not in models:
     raise ValueError("Unknown producer: "+options.producer)
 
-# check mode
-allowed_modes = ["Async", "Sync", "PseudoAsync"]
-if options.mode not in allowed_modes:
-    raise ValueError("Unknown mode: "+options.mode)
-
 process = cms.Process('tritonTest')
 
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxEvents) )
 
 process.source = cms.Source("EmptySource")
 
-process.TritonProducer = cms.EDProducer(options.producer+options.mode,
+process.TritonProducer = cms.EDProducer(options.producer,
     Client = cms.PSet(
+        mode = cms.string(options.mode),
         batchSize = cms.untracked.uint32(options.batchSize),
         address = cms.untracked.string(options.address),
         port = cms.untracked.uint32(options.port),

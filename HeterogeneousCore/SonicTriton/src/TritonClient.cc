@@ -18,18 +18,17 @@ namespace nic = ni::client;
 
 //based on https://github.com/NVIDIA/triton-inference-server/blob/v1.12.0/src/clients/c++/examples/simple_callback_client.cc
 
-template <typename Client>
-TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
-    : url_(params.getUntrackedParameter<std::string>("address") + ":" +
+TritonClient::TritonClient(const edm::ParameterSet& params)
+    : SonicClient(params),
+      url_(params.getUntrackedParameter<std::string>("address") + ":" +
            std::to_string(params.getUntrackedParameter<unsigned>("port"))),
       timeout_(params.getUntrackedParameter<unsigned>("timeout")),
       modelName_(params.getParameter<std::string>("modelName")),
       modelVersion_(params.getParameter<int>("modelVersion")),
-      verbose_(params.getUntrackedParameter<bool>("verbose")),
-      allowedTries_(params.getUntrackedParameter<unsigned>("allowedTries")) {
-  this->clientName_ = "TritonClient";
+      verbose_(params.getUntrackedParameter<bool>("verbose")) {
+  clientName_ = "TritonClient";
   //will get overwritten later, just used in constructor
-  this->fullDebugName_ = this->clientName_;
+  fullDebugName_ = clientName_;
 
   //connect to the server
   triton_utils::wrap(nic::InferGrpcContext::Create(&context_, url_, modelName_, modelVersion_, false),
@@ -66,7 +65,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
            << "\n";
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput->Name();
-    const auto& curr_itr = this->input_.emplace(
+    const auto& curr_itr = input_.emplace(
         std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput));
     if (verbose_) {
       const auto& curr_input = curr_itr.first->second;
@@ -81,7 +80,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
            << "\n";
   for (const auto& nicOutput : nicOutputs) {
     const auto& oname = nicOutput->Name();
-    const auto& curr_itr = this->output_.emplace(
+    const auto& curr_itr = output_.emplace(
         std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput));
     const auto& curr_output = curr_itr.first->second;
     triton_utils::wrap(options_->AddRawResult(curr_output.data()),
@@ -100,7 +99,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   noBatch_ = maxBatchSize_ == 0;
   maxBatchSize_ = std::max(1u, maxBatchSize_);
   //check requested batch size
-  this->setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
+  setBatchSize(params.getUntrackedParameter<unsigned>("batchSize"));
 
   //initial server settings
   triton_utils::wrap(context_->SetRunOptions(*options_), "TritonClient(): unable to set run options");
@@ -117,7 +116,7 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
   bool has_server = false;
   if (verbose_) {
     //print model info
-    edm::LogInfo(this->fullDebugName_) << model_msg.str() << io_msg.str();
+    edm::LogInfo(fullDebugName_) << model_msg.str() << io_msg.str();
 
     has_server = triton_utils::warn(nic::ServerStatusGrpcContext::Create(&serverCtx_, url_, false),
                                     "TritonClient(): unable to create server context");
@@ -126,20 +125,19 @@ TritonClient<Client>::TritonClient(const edm::ParameterSet& params)
     serverCtx_ = nullptr;
 }
 
-template <typename Client>
-bool TritonClient<Client>::setBatchSize(unsigned bsize) {
+bool TritonClient::setBatchSize(unsigned bsize) {
   if (bsize > maxBatchSize_) {
-    edm::LogWarning(this->fullDebugName_)
+    edm::LogWarning(fullDebugName_)
         << "Requested batch size " << bsize << " exceeds server-specified max batch size " << maxBatchSize_
         << ". Batch size will remain as" << batchSize_;
     return false;
   } else {
     batchSize_ = bsize;
     //set for input and output
-    for (auto& element : this->input_) {
+    for (auto& element : input_) {
       element.second.set_batch_size(bsize);
     }
-    for (auto& element : this->output_) {
+    for (auto& element : output_) {
       element.second.set_batch_size(bsize);
     }
     //set for server (and Input objects)
@@ -151,25 +149,23 @@ bool TritonClient<Client>::setBatchSize(unsigned bsize) {
   }
 }
 
-template <typename Client>
-void TritonClient<Client>::reset() {
-  for (auto& element : this->input_) {
+void TritonClient::reset() {
+  for (auto& element : input_) {
     element.second.reset();
   }
-  for (auto& element : this->output_) {
+  for (auto& element : output_) {
     element.second.reset();
   }
 }
 
-template <typename Client>
-bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic::InferContext::Result>>& results) {
+bool TritonClient::getResults(std::map<std::string, std::unique_ptr<nic::InferContext::Result>>& results) {
   for (auto& element : results) {
     const auto& oname = element.first;
     auto& result = element.second;
 
     //check for corresponding entry in output map
-    auto itr = this->output_.find(oname);
-    if (itr == this->output_.end()) {
+    auto itr = output_.find(oname);
+    if (itr == output_.end()) {
       edm::LogError("TritonServerError") << "getResults(): no entry in output map for result " << oname;
       return false;
     }
@@ -191,55 +187,17 @@ bool TritonClient<Client>::getResults(std::map<std::string, std::unique_ptr<nic:
 }
 
 //default case for sync and pseudo async
-template <typename Client>
-void TritonClient<Client>::evaluate() {
+void TritonClient::evaluate() {
   //in case there is nothing to process
   if (batchSize_ == 0) {
-    this->finish(true);
+    finish(true);
     return;
   }
 
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();
 
-  //blocking call
-  auto t1 = std::chrono::high_resolution_clock::now();
-  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  bool status = triton_utils::warn(context_->Run(&results), "evaluate(): unable to run and/or get result");
-  if (!status) {
-    this->finish(false);
-    return;
-  }
-
-  auto t2 = std::chrono::high_resolution_clock::now();
-  if (!this->debugName_.empty())
-    edm::LogInfo(this->fullDebugName_) << "Remote time: "
-                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-
-  const auto& end_status = getServerSideStatus();
-
-  if (verbose()) {
-    const auto& stats = summarizeServerStats(start_status, end_status);
-    reportServerSideStats(stats);
-  }
-
-  status = getResults(results);
-
-  this->finish(status);
-}
-
-//specialization for true async
-template <>
-void TritonClientAsync::evaluate() {
-  //in case there is nothing to process
-  if (batchSize_ == 0) {
-    this->finish(true);
-    return;
-  }
-
-  // Get the status of the server prior to the request being made.
-  const auto& start_status = getServerSideStatus();
-
+  if(mode_==SonicMode::Async){
   //non-blocking call
   auto t1 = std::chrono::high_resolution_clock::now();
   bool status = triton_utils::warn(
@@ -276,11 +234,37 @@ void TritonClientAsync::evaluate() {
 
   //if AsyncRun failed, finish() wasn't called
   if (!status)
-    this->finish(false);
+    finish(false);
+  }
+  else {
+  //blocking call
+  auto t1 = std::chrono::high_resolution_clock::now();
+  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+  bool status = triton_utils::warn(context_->Run(&results), "evaluate(): unable to run and/or get result");
+  if (!status) {
+    finish(false);
+    return;
+  }
+
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (!debugName_.empty())
+    edm::LogInfo(fullDebugName_) << "Remote time: "
+                                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+
+  const auto& end_status = getServerSideStatus();
+
+  if (verbose()) {
+    const auto& stats = summarizeServerStats(start_status, end_status);
+    reportServerSideStats(stats);
+  }
+
+  status = getResults(results);
+
+  finish(status);
+  }
 }
 
-template <typename Client>
-void TritonClient<Client>::reportServerSideStats(const typename TritonClient<Client>::ServerSideStats& stats) const {
+void TritonClient::reportServerSideStats(const TritonClient::ServerSideStats& stats) const {
   std::stringstream msg;
 
   // https://github.com/NVIDIA/tensorrt-inference-server/blob/v1.12.0/src/clients/c++/perf_client/inference_profiler.cc
@@ -307,12 +291,11 @@ void TritonClient<Client>::reportServerSideStats(const typename TritonClient<Cli
         << "compute " << compute_avg_us << " usec)" << std::endl;
   }
 
-  if (!this->debugName_.empty())
-    edm::LogInfo(this->fullDebugName_) << msg.str();
+  if (!debugName_.empty())
+    edm::LogInfo(fullDebugName_) << msg.str();
 }
 
-template <typename Client>
-typename TritonClient<Client>::ServerSideStats TritonClient<Client>::summarizeServerStats(
+TritonClient::ServerSideStats TritonClient::summarizeServerStats(
     const ni::ModelStatus& start_status, const ni::ModelStatus& end_status) const {
   // If model_version is -1 then look in the end status to find the
   // latest (highest valued version) and use that as the version.
@@ -324,7 +307,7 @@ typename TritonClient<Client>::ServerSideStats TritonClient<Client>::summarizeSe
   } else
     status_model_version = modelVersion_;
 
-  typename TritonClient<Client>::ServerSideStats server_stats;
+  TritonClient::ServerSideStats server_stats;
   auto vend_itr = end_status.version_status().find(status_model_version);
   if (vend_itr != end_status.version_status().end()) {
     auto end_itr = vend_itr->second.infer_stats().find(batchSize_);
@@ -354,8 +337,7 @@ typename TritonClient<Client>::ServerSideStats TritonClient<Client>::summarizeSe
   return server_stats;
 }
 
-template <typename Client>
-ni::ModelStatus TritonClient<Client>::getServerSideStatus() const {
+ni::ModelStatus TritonClient::getServerSideStatus() const {
   if (serverCtx_) {
     ni::ServerStatus server_status;
     serverCtx_->GetServerStatus(&server_status);
@@ -365,8 +347,3 @@ ni::ModelStatus TritonClient<Client>::getServerSideStatus() const {
   }
   return ni::ModelStatus{};
 }
-
-//explicit template instantiations
-template class TritonClient<SonicClientSync<TritonInputMap, TritonOutputMap>>;
-template class TritonClient<SonicClientAsync<TritonInputMap, TritonOutputMap>>;
-template class TritonClient<SonicClientPseudoAsync<TritonInputMap, TritonOutputMap>>;

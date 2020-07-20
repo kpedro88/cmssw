@@ -20,11 +20,7 @@ public:
   //constructor
   TritonData(const std::string& name, std::shared_ptr<IO> data);
 
-  //dims is fixed by the model info on server, immutable
-  const std::vector<int64_t>& dims() const { return dims_; }
-
   //some members can be modified
-  std::shared_ptr<IO>& data() { return data_; }
   std::vector<int64_t>& shape() { return shape_; }
   void reset();
   void setBatchSize(unsigned bsize) { batchSize_ = bsize; }
@@ -38,7 +34,8 @@ public:
 
   //const accessors
   const std::shared_ptr<IO>& data() const { return data_; }
-  const std::vector<int64_t>& shape() const { return shape_; }
+  const std::vector<int64_t>& dims() const { return dims_; }
+  const std::vector<int64_t>& shape() const { return shape_.empty() ? dims() : shape_; }
   int64_t byteSize() const { return byteSize_; }
   const std::string& dname() const { return dname_; }
   unsigned batchSize() const { return batchSize_; }

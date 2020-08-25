@@ -48,6 +48,9 @@ run2_GEM_2017.toReplaceWith(DigiToRawTask, _gem_DigiToRawTask)
 from Configuration.Eras.Modifier_run3_GEM_cff import run3_GEM
 run3_GEM.toReplaceWith(DigiToRawTask, _gem_DigiToRawTask)
 
+from Configuration.Eras.Modifier_phase2_ecal_cff import phase2_ecal
+phase2_ecal.toReplaceWith(DigiToRawTask, DigiToRawTask.copyAndExclude([esDigiToRaw]))
+
 from Configuration.Eras.Modifier_phase2_muon_cff import phase2_muon
 phase2_muon.toReplaceWith(DigiToRawTask, DigiToRawTask.copyAndExclude([rpcpacker]))
 

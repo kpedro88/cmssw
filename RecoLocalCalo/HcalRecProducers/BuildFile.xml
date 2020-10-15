@@ -18,4 +18,6 @@
 <use name="HeterogeneousCore/CUDAUtilities"/>
 <use name="RecoLocalCalo/HcalRecAlgos"/>
 <use name="SimCalorimetry/HcalSimAlgos"/>
-<flags EDM_PLUGIN="1"/>
+<use name="boost"/>
+<use name="HeterogeneousCore/SonicTriton"/>
+<use name="HeterogeneousCore/SonicCore"/>

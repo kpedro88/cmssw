@@ -15,11 +15,11 @@
 namespace trackerDTC {
 
   typedef edm::mpl::Vector<TrackerDigiGeometryRecord,
-                           TrackerTopologyRcd,
-                           IdealMagneticFieldRecord,
-                           IdealGeometryRecord,
-                           TrackerDetToDTCELinkCablingMapRcd,
-                           TTStubAlgorithmRecord>
+                             TrackerTopologyRcd,
+                             IdealMagneticFieldRecord,
+                             IdealGeometryRecord,
+                             TrackerDetToDTCELinkCablingMapRcd,
+                             TTStubAlgorithmRecord>
       Rcds;
 
   class SetupRcd : public edm::eventsetup::DependentRecordImplementation<SetupRcd, Rcds> {};

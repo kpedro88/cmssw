@@ -28,3 +28,15 @@ from RecoLocalCalo.HcalRecProducers.hcalCPURecHitsProducer_cfi import hcalCPURec
         produceSoA = False
     )
 )
+run3_HB.toReplaceWith( hbhereco, _phase1_hbheprereco ) # >=Run3
+
+#--- ML-based reco using SONIC+Triton
+hbhechannelinfo = _phase1_hbheprereco.clone(
+    makeRecHits = False,
+    saveInfos = True,
+    processQIE8 = False,
+)
+from RecoLocalCalo.HcalRecProducers.facileHcalReconstructor_cfi import sonic_hbheprereco as _sonic_hbheprereco
+from Configuration.ProcessModifiers.enableSonicTriton_cff import enableSonicTriton
+(enableSonicTriton & run3_HB).toReplaceWith(hbhereco, _sonic_hbheprereco)
+(enableSonicTriton & run3_HB).toModify(hcalGlobalRecoTask, lambda x: x.add(hbhechannelinfo))

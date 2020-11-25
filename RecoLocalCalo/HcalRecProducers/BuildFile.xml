@@ -22,4 +22,6 @@
 <use name="RecoLocalCalo/HcalRecAlgos"/>
 <use name="SimCalorimetry/CaloSimAlgos"/>
 <use name="SimCalorimetry/HcalSimAlgos"/>
+<use name="HeterogeneousCore/SonicTriton"/>
+<use name="HeterogeneousCore/SonicCore"/>
 <flags EDM_PLUGIN="1"/>

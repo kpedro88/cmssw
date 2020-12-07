@@ -7,23 +7,31 @@ VERBOSE=""
 WTIME=60
 SERVER=triton_server_instance
 RETRIES=3
+REPOS=()
+MODELS=()
+FORCE=""
+CLEANUP=true
 
 usage() {
 	ECHO="echo -e"
 	$ECHO "edmTriton [options] [start|stop]"
 	$ECHO
 	$ECHO "Options:"
-	$ECHO "-d        \t use Docker instead of Singularity"
-	$ECHO "-g        \t use GPU instead of CPU"
-	$ECHO "-n [name] \t name of container instance, also used for hidden temporary dir (default: ${SERVER})"
-	$ECHO "-r [num]  \t number of retries when starting container (default: ${RETRIES})"
-	$ECHO "-v        \t (verbose) start: activate server debugging info; stop: keep server logs"
-	$ECHO "-w [time] \t maximum time to wait for server to start (default: ${WTIME} seconds)"
-	$ECHO "-h        \t print this message and exit"
+	$ECHO "-c               \t don't cleanup temporary dir (for debugging)"
+	$ECHO "-d               \t use Docker instead of Singularity"
+	$ECHO "-f               \t force reuse of (possibly) existing container instance"
+	$ECHO "-g               \t use GPU instead of CPU"
+	$ECHO "-M [dir,dir,...] \t comma-separated list of model repositories"
+	$ECHO "-m [dir,dir,...] \t comma-separated list of specific model directories"
+	$ECHO "-n [name]        \t name of container instance, also used for hidden temporary dir (default: ${SERVER})"
+	$ECHO "-r [num]         \t number of retries when starting container (default: ${RETRIES})"
+	$ECHO "-v               \t (verbose) start: activate server debugging info; stop: keep server logs"
+	$ECHO "-w [time]        \t maximum time to wait for server to start (default: ${WTIME} seconds)"
+	$ECHO "-h               \t print this message and exit"
 	$ECHO
 	$ECHO "Operations:"
-	$ECHO "start    \t start server"
-	$ECHO "stop    \t stop server"
+	$ECHO "start            \t start server"
+	$ECHO "stop             \t stop server"
 	exit $1
 }
 
@@ -33,11 +41,19 @@ if [ -e /run/shm ]; then
 	SHM=/run/shm
 fi
 
-while getopts "dgn:r:vw:h" opt; do
+while getopts "cdfgM:m:n:r:vw:h" opt; do
 	case "$opt" in
+		c) CLEANUP=""
+		;;
 		d) USEDOCKER=true
 		;;
+		f) FORCE=true
+		;;
 		g) GPU=true
+		;;
+		M) IFS="," read -a REPOS <<< "$OPTARG"
+		;;
+		m) IFS="," read -a MODELS <<< "$OPTARG"
 		;;
 		n) SERVER="$OPTARG"
 		;;
@@ -67,17 +83,24 @@ TOPDIR=$PWD
 TMPDIR=".${SERVER}"
 DOCKER="sudo docker"
 IMAGE=fastml/triton-torchgeo:20.09-py3-geometric
-MODELS=${CMSSW_BASE}/src/HeterogeneousCore/SonicTriton/data/models
+MODELREPO="models"
+MODELDIR="$TOPDIR"/"$TMPDIR"/"$MODELREPO"
 LOG="log_${SERVER}.log"
 LIB=lib
 STARTED_INDICATOR="Started GRPCInferenceService"
 EXTRA=""
 
 start_docker(){
+	# mount all model directories
+	MOUNTS=""
+	for MODEL in ${MODELS[@]}; do
+		MOUNTS="$MOUNTS -v$MODEL:$MODEL"
+	done
+
 	$DOCKER run -d --name ${SERVER} \
 		--shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
 		-p8000:8000 -p8001:8001 -p8002:8002 $EXTRA \
-		-v${MODELS}:/models \
+		-v"${MODELDIR}":/models $MOUNTS \
 		${IMAGE} tritonserver --model-repository=/models $VERBOSE
 }
 
@@ -88,10 +111,16 @@ start_singularity(){
 	mkdir ${LIB}
 	ln -s /cvmfs/unpacked.cern.ch/registry.hub.docker.com/${IMAGE}/opt/tritonserver/lib/* ${LIB}/
 
+	# mount all model directories
+	MOUNTS=""
+	for MODEL in ${MODELS[@]}; do
+		MOUNTS="$MOUNTS -B $MODEL"
+	done
+
 	# start instance
 	# need to bind /cvmfs for above symlinks to work inside container
 	singularity instance start \
-		-B ${SHM}:/run/shm -B ${MODELS}:/models -B ${LIB}:/opt/tritonserver/lib -B /cvmfs $EXTRA \
+		-B ${SHM}:/run/shm -B "${MODELDIR}":/models -B ${LIB}:/opt/tritonserver/lib -B /cvmfs $MOUNTS $EXTRA \
 		/cvmfs/unpacked.cern.ch/registry.hub.docker.com/${IMAGE} ${SERVER}
 
 	START_EXIT=$?
@@ -135,6 +164,7 @@ wait_server(){
 		if [ "$COUNT" -gt "$WTIME" ]; then
 			echo "timed out waiting for server to start"
 			VERBOSE=true $STOP_FN
+			cleanup
 			exit 1
 		else
 			COUNT=$(($COUNT + 1))
@@ -144,6 +174,28 @@ wait_server(){
 
 	echo "server is ready!"
 	exit 0
+}
+
+cleanup(){
+	if [ -n "$CLEANUP" ]; then
+		cd "$TOPDIR"
+		rm -rf "$TMPDIR"
+	fi
+}
+
+assemble_models(){
+	# assemble repository by linking model directories
+	mkdir "$MODELREPO"
+	for REPO in ${REPOS[@]}; do
+		for MODEL in "$REPO"/*/; do
+			MODELS+=("$MODEL")
+		done
+	done
+	for ((m=0; m < ${#MODELS[@]}; m++)); do
+		# avoid issues w/ multiple levels of symlinks
+		MODELS[$m]=$(readlink -f ${MODELS[$m]})
+		ln -s "${MODELS[$m]}" "$MODELREPO"/$(basename "${MODELS[$m]}")
+	done
 }
 
 if [ -n "$USEDOCKER" ]; then
@@ -165,9 +217,20 @@ else
 fi
 
 if [ "$OP" == start ]; then
+	# handle cleaning up
+	if [ -n "$FORCE" ]; then
+		$STOP_FN
+		cleanup
+	elif [ -d "$TMPDIR" ]; then
+		echo "Error: this container may already exist (override with -f)"
+		exit 1
+	fi
+
 	# make sure everything happens in tmp dir
 	mkdir "$TMPDIR"
 	cd "$TMPDIR"
+
+	assemble_models
 
 	START_EXIT=""
 	for ((counter=0; counter < ${RETRIES}; counter++)); do
@@ -195,8 +258,5 @@ else
 	fi
 
 	$STOP_FN
-
-	# cleanup
-	cd "$TOPDIR"
-	rm -rf "$TMPDIR"
+	cleanup
 fi

@@ -6,17 +6,19 @@ GPU=""
 VERBOSE=""
 WTIME=60
 SERVER=triton_server_instance
+RETRIES=3
 
 usage() {
 	ECHO="echo -e"
-	$ECHO "triton [options] [start|stop]"
+	$ECHO "edmTriton [options] [start|stop]"
 	$ECHO
 	$ECHO "Options:"
 	$ECHO "-d        \t use Docker instead of Singularity"
 	$ECHO "-g        \t use GPU instead of CPU"
-	$ECHO "-n        \t name of container instance (default: ${SERVER})"
+	$ECHO "-n [name] \t name of container instance (default: ${SERVER})"
+	$ECHO "-r [num]  \t number of retries when starting container (default: ${RETRIES})"
 	$ECHO "-v        \t (verbose) start: activate server debugging info; stop: keep server logs"
-	$ECHO "-w        \t maximum time to wait for server to start (default: ${WTIME} seconds)"
+	$ECHO "-w [time] \t maximum time to wait for server to start (default: ${WTIME} seconds)"
 	$ECHO "-h        \t print this message and exit"
 	$ECHO
 	$ECHO "Operations:"
@@ -31,19 +33,21 @@ if [ -e /run/shm ]; then
 	SHM=/run/shm
 fi
 
-while getopts "dgvhw:n:" opt; do
+while getopts "dgn:r:vw:h" opt; do
 	case "$opt" in
 		d) USEDOCKER=true
 		;;
 		g) GPU=true
 		;;
-		v) VERBOSE="--log-verbose=1 --log-error=1 --log-info=1"
+		n) SERVER="$OPTARG"
 		;;
-		h) usage 0
+		r) RETRIES="$OPTARG"
+		;;
+		v) VERBOSE="--log-verbose=1 --log-error=1 --log-info=1"
 		;;
 		w) WTIME="$OPTARG"
 		;;
-		n) SERVER="$OPTARG"
+		h) usage 0
 		;;
 	esac
 done
@@ -156,8 +160,17 @@ else
 fi
 
 if [ "$OP" == start ]; then
-	$START_FN
-	START_EXIT=$?
+	START_EXIT=""
+	for ((counter=0; counter < ${RETRIES}; counter++)); do
+		$START_FN
+		START_EXIT=$?
+		if [ "$START_EXIT" -eq 0 ]; then
+			break
+		else
+			echo "Retrying after container issue..."
+			$STOP_FN
+		fi
+	done
 	if [ "$START_EXIT" -ne 0 ]; then
 		echo "Error from $PROG_NAME"
 		exit "$START_EXIT"

@@ -1,6 +1,7 @@
 #include "HeterogeneousCore/SonicTriton/interface/TritonService.h"
 #include "HeterogeneousCore/SonicTriton/interface/triton_utils.h"
 
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
@@ -12,12 +13,11 @@ namespace nic = ni::client;
 
 TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg) {
 	//loop over input servers: check which models they have
-	auto& mapServers = mapServersModels_.by<Server>();
 	for(const auto& serverPset : pset.getParameterSetVector("servers")){
 		Server tmp(serverPset);
 		//ensure uniqueness
-		auto it = mapServers.find(tmp.name);
-		if (it!=mapServers.end())
+		auto sit = servers_.find(tmp);
+		if (sit!=servers_.end())
 			throw cms::Exception("DuplicateServer") << "Not allowed to specify more than one server with same name (" << tmp.name << ")";
 
 		std::unique_ptr<nic::InferenceServerGrpcClient> client;
@@ -26,15 +26,35 @@ TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistr
 		inference::RepositoryIndexResponse repoIndexResponse;
 		triton_utils::throwIfError(client->ModelRepositoryIndex(&repoIndexResponse), "TritonService(): unable to get repository index for "+tmp.name+" ("+tmp.url+")");
 
+		//servers keep track of models and vice versa
 		for(const auto& modelIndex : repoIndexResponse.models()){
-			mapServersModels_.insert(Server,modelIndex.name());
+			const auto& modelName = modelIndex.name();
+			auto mit = findModel(modelName);
+			if(mit==models_.end())
+				mit = models_.emplace(modelName).first;
+			mit->servers.insert(tmp.name);
+			tmp.models.insert(modelName);
 		}
+		servers_.insert(tmp);
 	}
 }
 
 std::string TritonService::serverAddress(const std::string& model, const std::string& preferred) const {
+	auto mit = findModel(model);
+	if(mit==models_.end())
+		throw cms::Exception("MissingModel") << "There are no servers that provide model " << model;
+
+	const auto& modelServers = mit->servers;
+
 	if(!preferred.empty()){
-		
+		auto sit = modelServers.find(preferred);
+		//todo: add a "strict" parameter to stop execution if preferred server isn't found?
+		if(sit==modelServers.end())
+			edm::LogWarning("PreferredServer") << "Preferred server " << preferred << " for model " << model << " not available, will choose another server";
+		else
+			return findServer(preferred)->url;
 	}
-	return "";
+
+	//todo: use some algorithm to select server rather than just picking arbitrarily
+	return findServer(*modelServers.begin())->url;
 }

@@ -3,9 +3,8 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
-#include "boost/bimap/bimap.hpp"
-#include "boost/bimap/unordered_multiset_of.hpp"
-
+#include <vector>
+#include <unordered_set>
 #include <string>
 #include <functional>
 
@@ -17,11 +16,9 @@ namespace edm {
 class TritonService {
 public:
 	//classes and defs
-	template <typename A, typename B, typename AH = std::hash<A>, typename AE = std::equal_to<A>, typename BH = std::hash<B>, typename BE = std::equal_to<B>>
-	using unordered_bimultimap = boost::bimaps::bimap<boost:bimaps::unordered_multiset_of<A,AH,AE>,boost::bimaps::unordered_multiset_of<B,BH,BE>>;
-
 	struct Server {
 		Server(const edm::ParameterSet& pset) : name(pset.getUntrackedParameter<std::string>("name")), url(pset.getUntrackedParameter<std::string>("address") + ":" + std::to_string(pset.getUntrackedParameter<unsigned>("port"))) {}
+		Server(const std::string& name_) : name(name_), url("") {}
 
 		struct Hash {
 			size_t operator()(const Server& obj) const {
@@ -39,9 +36,28 @@ public:
 		//members
 		std::string name;
 		std::string url;
+		std::unordered_set<std::string> models;
 	};
-	struct Model {};
-	using ServerModelMap = unordered_bimultimap<boost::bimaps::tagged<Server,Server>,boost::bimaps::tagged<std::string,Model>,Server::Hash,Server::Equal>;
+	struct Model {
+		Model(const std::string& name_) : name(name_) {}
+
+		struct Hash {
+			size_t operator()(const Model& obj) const {
+				return hashObj(obj.name);
+			}
+			std::hash<std::string> hashObj;
+		};
+
+		struct Equal {
+			bool operator()(const Model& lhs, const Model& rhs) const {
+				return lhs.name == rhs.name;
+			}
+		};
+
+		//members
+		std::string name;
+		std::unordered_set<std::string> servers;
+	};
 
 	TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg);
 
@@ -49,8 +65,13 @@ public:
 	std::string serverAddress(const std::string& model, const std::string& preferred="") const;
 
 private:
-	//members
-	ServerModelMap mapServersModels_;
+	//to search without full object
+	auto findServer(const std::string& name) const { return servers_.find(Server(name)); }
+	auto findModel(const std::string& name) const { return models_.find(Model(name)); }
+
+	//this is a lazy and inefficient many:many map
+	std::unordered_set<Server,Server::Hash,Server::Equal> servers_;
+	std::unordered_set<Model,Model::Hash,Model::Equal> models_;
 };
 
 #endif

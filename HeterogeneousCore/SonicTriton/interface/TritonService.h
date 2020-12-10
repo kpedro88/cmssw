@@ -9,16 +9,28 @@
 #include <unordered_set>
 #include <string>
 #include <functional>
+#include <utility>
 
 //forward declarations
 namespace edm {
 	class ActivityRegistry;
 	class ConfigurationDescriptions;
+	class PathsAndConsumesOfModulesBase;
+	class ProcessContext;
 }
 
 class TritonService {
 public:
 	//classes and defs
+	struct FallbackOpts {
+		FallbackOpts(const edm::ParameterSet& pset) : enable(pset.getUntrackedParameter<bool>("enable")), useDocker(pset.getUntrackedParameter<bool>("useDocker")), useGPU(pset.getUntrackedParameter<bool>("useGPU")), retries(pset.getUntrackedParameter<unsigned>("retries")), wait(pset.getUntrackedParameter<unsigned>("wait")) {}
+
+		bool enable;
+		bool useDocker;
+		bool useGPU;
+		int retries;
+		int wait;
+	};
 	struct Server {
 		Server(const edm::ParameterSet& pset) : name(pset.getUntrackedParameter<std::string>("name")), url(pset.getUntrackedParameter<std::string>("address") + ":" + std::to_string(pset.getUntrackedParameter<unsigned>("port"))) {}
 		Server(const std::string& name_) : name(name_), url("") {}
@@ -64,18 +76,22 @@ public:
 	};
 
 	TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg);
+	~TritonService();
 
 	//accessors
 	void addModel(const std::string& model, const std::string& path);
-	std::string serverAddress(const std::string& model, const std::string& preferred="") const;
+	std::pair<std::string,bool> serverAddress(const std::string& model, const std::string& preferred="") const;
 
 	static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
 private:
+	void preBeginJob(edm::PathsAndConsumesOfModulesBase const&, edm::ProcessContext const&);
+
 	//to search without full object
 	auto findServer(const std::string& name) const { return servers_.find(Server(name)); }
 	auto findModel(const std::string& name) const { return models_.find(Model(name)); }
 
+	FallbackOpts fallbackOpts_;
 	//concurrent data type is used because addModel() might be called by multiple threads
 	tbb::concurrent_unordered_set<Model,Model::Hash,Model::Equal> unservedModels_;
 	//this is a lazy and inefficient many:many map

@@ -5,6 +5,7 @@
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
+#include "FWCore/ServiceRegistry/interface/ProcessContext.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
 #include "grpc_client.h"
@@ -13,7 +14,10 @@
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
 
-TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg) {
+TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg) : fallbackOpts_(pset.getParameterSet("Fallback")) {
+	//fallback server will be launched (if needed) before beginJob
+	areg.watchPreBeginJob(this, &TritonService::preBeginJob);
+
 	//loop over input servers: check which models they have
 	for(const auto& serverPset : pset.getUntrackedParameterSetVector("servers")){
 		Server tmp(serverPset);
@@ -48,7 +52,8 @@ void TritonService::addModel(const std::string& model, const std::string& path) 
 		unservedModels_.emplace(model,path);
 }
 
-std::string TritonService::serverAddress(const std::string& model, const std::string& preferred) const {
+//second return value is only true if fallback CPU server is being used
+std::pair<std::string,bool> TritonService::serverAddress(const std::string& model, const std::string& preferred) const {
 	auto mit = findModel(model);
 	if(mit==models_.end())
 		throw cms::Exception("MissingModel") << "There are no servers that provide model " << model;
@@ -61,11 +66,19 @@ std::string TritonService::serverAddress(const std::string& model, const std::st
 		if(sit==modelServers.end())
 			edm::LogWarning("PreferredServer") << "Preferred server " << preferred << " for model " << model << " not available, will choose another server";
 		else
-			return findServer(preferred)->url;
+			return std::make_pair(findServer(preferred)->url,false);
 	}
 
 	//todo: use some algorithm to select server rather than just picking arbitrarily
-	return findServer(*modelServers.begin())->url;
+	return std::make_pair(findServer(*modelServers.begin())->url,false);
+}
+
+void TritonService::preBeginJob(edm::PathsAndConsumesOfModulesBase const&, edm::ProcessContext const&) {
+	if (!fallbackOpts_.enable) return;
+}
+
+TritonService::~TritonService() {
+	if (!fallbackOpts_.enable) return;
 }
 
 void TritonService::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
@@ -77,6 +90,14 @@ void TritonService::fillDescriptions(edm::ConfigurationDescriptions& description
 	validator.addUntracked<unsigned>("port");
 
 	desc.addVPSetUntracked("servers", validator);
+
+	edm::ParameterSetDescription fallbackDesc;
+	fallbackDesc.addUntracked<bool>("enable",false);
+	fallbackDesc.addUntracked<bool>("useDocker",false);
+	fallbackDesc.addUntracked<bool>("useGPU",false);
+	fallbackDesc.addUntracked<unsigned>("retries",3);
+	fallbackDesc.addUntracked<unsigned>("wait",60);
+	desc.add<edm::ParameterSetDescription>("Fallback",fallbackDesc);
 
 	descriptions.addWithDefaultLabel(desc);
 }

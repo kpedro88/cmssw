@@ -42,7 +42,7 @@ public:
 		mutable std::unordered_set<std::string> models;
 	};
 	struct Model {
-		Model(const std::string& name_) : name(name_) {}
+		Model(const std::string& name_, const std::string& path_="") : name(name_), path(path_) {}
 
 		struct Hash {
 			size_t operator()(const Model& obj) const {
@@ -59,13 +59,14 @@ public:
 
 		//members
 		std::string name;
+		std::string path;
 		mutable std::unordered_set<std::string> servers;
 	};
 
 	TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg);
 
 	//accessors
-	void addModel(const std::string& model);
+	void addModel(const std::string& model, const std::string& path);
 	std::string serverAddress(const std::string& model, const std::string& preferred="") const;
 
 	static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
@@ -76,7 +77,7 @@ private:
 	auto findModel(const std::string& name) const { return models_.find(Model(name)); }
 
 	//concurrent data type is used because addModel() might be called by multiple threads
-	tbb::concurrent_unordered_set<std::string> unservedModels_;
+	tbb::concurrent_unordered_set<Model,Model::Hash,Model::Equal> unservedModels_;
 	//this is a lazy and inefficient many:many map
 	std::unordered_set<Server,Server::Hash,Server::Equal> servers_;
 	std::unordered_set<Model,Model::Hash,Model::Equal> models_;

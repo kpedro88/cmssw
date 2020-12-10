@@ -54,6 +54,7 @@ process.TritonProducer = cms.EDProducer(options.producer,
         timeout = cms.untracked.uint32(options.timeout),
         modelName = cms.string(models[options.producer]),
         modelVersion = cms.string(""),
+        modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/{}/config.pbtxt".format(models[options.producer])),
         verbose = cms.untracked.bool(options.verbose),
         allowedTries = cms.untracked.uint32(0),
     )

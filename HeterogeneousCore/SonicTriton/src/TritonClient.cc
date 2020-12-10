@@ -1,4 +1,5 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/FileInPath.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "HeterogeneousCore/SonicTriton/interface/TritonClient.h"
@@ -340,6 +341,7 @@ void TritonClient::fillPSetDescription(edm::ParameterSetDescription& iDesc) {
   fillBasePSetDescription(descClient);
   descClient.add<std::string>("modelName");
   descClient.add<std::string>("modelVersion", "");
+  descClient.add<edm::FileInPath>("modelConfigPath");
   //server parameters should not affect the physics results
   descClient.addUntracked<std::string>("preferredServer","");
   descClient.addUntracked<unsigned>("timeout");

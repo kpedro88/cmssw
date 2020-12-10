@@ -41,11 +41,11 @@ TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistr
 	}
 }
 
-void TritonService::addModel(const std::string& model) {
+void TritonService::addModel(const std::string& model, const std::string& path) {
 	//if model is not in the list, then no specified server provides it
 	auto mit = findModel(model);
 	if(mit==models_.end())
-		unservedModels_.insert(model);
+		unservedModels_.emplace(model,path);
 }
 
 std::string TritonService::serverAddress(const std::string& model, const std::string& preferred) const {

@@ -3,6 +3,8 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+#include "tbb/concurrent_unordered_set.h"
+
 #include <vector>
 #include <unordered_set>
 #include <string>
@@ -63,6 +65,7 @@ public:
 	TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg);
 
 	//accessors
+	void addModel(const std::string& model);
 	std::string serverAddress(const std::string& model, const std::string& preferred="") const;
 
 	static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
@@ -72,6 +75,8 @@ private:
 	auto findServer(const std::string& name) const { return servers_.find(Server(name)); }
 	auto findModel(const std::string& name) const { return models_.find(Model(name)); }
 
+	//concurrent data type is used because addModel() might be called by multiple threads
+	tbb::concurrent_unordered_set<std::string> unservedModels_;
 	//this is a lazy and inefficient many:many map
 	std::unordered_set<Server,Server::Hash,Server::Equal> servers_;
 	std::unordered_set<Model,Model::Hash,Model::Equal> models_;

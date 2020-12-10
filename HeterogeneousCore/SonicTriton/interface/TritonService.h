@@ -11,6 +11,7 @@
 //forward declarations
 namespace edm {
 	class ActivityRegistry;
+	class ConfigurationDescriptions;
 }
 
 class TritonService {
@@ -36,7 +37,7 @@ public:
 		//members
 		std::string name;
 		std::string url;
-		std::unordered_set<std::string> models;
+		mutable std::unordered_set<std::string> models;
 	};
 	struct Model {
 		Model(const std::string& name_) : name(name_) {}
@@ -56,13 +57,15 @@ public:
 
 		//members
 		std::string name;
-		std::unordered_set<std::string> servers;
+		mutable std::unordered_set<std::string> servers;
 	};
 
 	TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg);
 
 	//accessors
 	std::string serverAddress(const std::string& model, const std::string& preferred="") const;
+
+	static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
 private:
 	//to search without full object

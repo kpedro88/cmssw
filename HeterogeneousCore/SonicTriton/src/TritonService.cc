@@ -2,6 +2,8 @@
 #include "HeterogeneousCore/SonicTriton/interface/triton_utils.h"
 
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
@@ -13,7 +15,7 @@ namespace nic = ni::client;
 
 TritonService::TritonService(const edm::ParameterSet& pset, edm::ActivityRegistry& areg) {
 	//loop over input servers: check which models they have
-	for(const auto& serverPset : pset.getParameterSetVector("servers")){
+	for(const auto& serverPset : pset.getUntrackedParameterSetVector("servers")){
 		Server tmp(serverPset);
 		//ensure uniqueness
 		auto sit = servers_.find(tmp);
@@ -57,4 +59,17 @@ std::string TritonService::serverAddress(const std::string& model, const std::st
 
 	//todo: use some algorithm to select server rather than just picking arbitrarily
 	return findServer(*modelServers.begin())->url;
+}
+
+void TritonService::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+	edm::ParameterSetDescription desc;
+
+	edm::ParameterSetDescription validator;
+	validator.addUntracked<std::string>("name");
+	validator.addUntracked<std::string>("address");
+	validator.addUntracked<unsigned>("port");
+
+	desc.addVPSetUntracked("servers", validator);
+
+	descriptions.addWithDefaultLabel(desc);
 }

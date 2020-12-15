@@ -1,6 +1,8 @@
 #ifndef SimG4Core_TrackingAction_H
 #define SimG4Core_TrackingAction_H
 
+#include <set>
+
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "SimG4Core/Notification/interface/SimActivityRegistry.h"
 #include "SimG4Core/Notification/interface/TrackInformationExtractor.h"
@@ -35,6 +37,7 @@ private:
   CMSSteppingVerbose* steppingVerbose_;
   const G4Track* g4Track_;
   bool checkTrack_;
+  bool doFineCalo_;
 };
 
 #endif

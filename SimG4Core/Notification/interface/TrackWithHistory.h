@@ -2,8 +2,10 @@
 #define SimG4Core_TrackWithHistory_H
 
 #include "G4Track.hh"
+#include "FWCore/Utilities/interface/Exception.h"
 #include "DataFormats/Math/interface/Vector3D.h"
 #include "DataFormats/Math/interface/LorentzVector.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 
 #include "G4Allocator.hh"
 
@@ -42,6 +44,20 @@ public:
   void setGenParticleID(int i) { genParticleID_ = i; }
   bool storeTrack() const { return storeTrack_; }
   bool saved() const { return saved_; }
+
+  // Boundary crossing variables
+  void setCrossedBoundaryPosMom(int id,
+                                const math::XYZTLorentzVectorF position,
+                                const math::XYZTLorentzVectorF momentum) {
+    crossedBoundary_ = true;
+    idAtBoundary_ = id;
+    positionAtBoundary_ = position;
+    momentumAtBoundary_ = momentum;
+  }
+  bool crossedBoundary() const { return crossedBoundary_; }
+  const math::XYZTLorentzVectorF getPositionAtBoundary() const { return positionAtBoundary_; }
+  const math::XYZTLorentzVectorF getMomentumAtBoundary() const { return momentumAtBoundary_; }
+  int getIDAtBoundary() const { return idAtBoundary_; }
   /** Internal consistency check (optional).
      *  Method called at PostUserTrackingAction time, to check
      *  if the information is consistent with that provided
@@ -64,6 +80,13 @@ private:
   double weight_;
   bool storeTrack_;
   bool saved_;
+
+  bool isPrimary_;
+  bool crossedBoundary_;
+  int idAtBoundary_;
+  math::XYZTLorentzVectorF positionAtBoundary_;
+  math::XYZTLorentzVectorF momentumAtBoundary_;
+
   int extractGenID(const G4Track *gt) const;
 };
 

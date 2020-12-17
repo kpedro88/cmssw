@@ -13,7 +13,12 @@
 
 class TritonGraphProducer : public TritonEDProducer<> {
 public:
-  explicit TritonGraphProducer(edm::ParameterSet const& cfg) : TritonEDProducer<>(cfg, "TritonGraphProducer") {}
+  explicit TritonGraphProducer(edm::ParameterSet const& cfg)
+      : TritonEDProducer<>(cfg, "TritonGraphProducer"),
+        nodeMin_(cfg.getParameter<unsigned>("nodeMin")),
+        nodeMax_(cfg.getParameter<unsigned>("nodeMax")),
+        edgeMin_(cfg.getParameter<unsigned>("edgeMin")),
+        edgeMax_(cfg.getParameter<unsigned>("edgeMax")) {}
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     //get event-based seed for RNG
     unsigned int runNum_uint = static_cast<unsigned int>(iEvent.id().run());
@@ -22,9 +27,9 @@ public:
     std::uint32_t seed = (lumiNum_uint << 10) + (runNum_uint << 20) + evNum_uint;
     std::mt19937 rng(seed);
 
-    std::uniform_int_distribution<int> randint1(100, 4000);
+    std::uniform_int_distribution<int> randint1(nodeMin_, nodeMax_);
     int nnodes = randint1(rng);
-    std::uniform_int_distribution<int> randint2(8000, 15000);
+    std::uniform_int_distribution<int> randint2(edgeMin_, edgeMax_);
     int nedges = randint2(rng);
 
     //set shapes
@@ -75,9 +80,18 @@ public:
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
     edm::ParameterSetDescription desc;
     TritonClient::fillPSetDescription(desc);
+    desc.add<unsigned>("nodeMin", 100);
+    desc.add<unsigned>("nodeMax", 4000);
+    desc.add<unsigned>("edgeMin", 8000);
+    desc.add<unsigned>("edgeMax", 15000);
     //to ensure distinct cfi names
     descriptions.addWithDefaultLabel(desc);
   }
+
+private:
+  //members
+  unsigned nodeMin_, nodeMax_;
+  unsigned edgeMin_, edgeMax_;
 };
 
 DEFINE_FWK_MODULE(TritonGraphProducer);

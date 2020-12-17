@@ -14,6 +14,7 @@ options.register("producer", "TritonImageProducer", VarParsing.multiplicity.sing
 options.register("modelName","resnet50_netdef", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("mode","PseudoAsync", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("verbose", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
+options.register("unittest", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.parseArguments()
 
 if len(options.params)>0:
@@ -68,6 +69,18 @@ if options.producer=="TritonImageProducer":
     process.TritonProducer.batchSize = cms.uint32(1)
     process.TritonProducer.topN = cms.uint32(5)
     process.TritonProducer.imageList = cms.string("../data/models/resnet50_netdef/resnet50_labels.txt")
+elif options.producer=="TritonGraphProducer":
+    if options.unittest:
+        # reduce input size for unit test
+        process.TritonProducer.nodeMin = cms.uint32(1)
+        process.TritonProducer.nodeMax = cms.uint32(10)
+        process.TritonProducer.edgeMin = cms.uint32(20)
+        process.TritonProducer.edgeMax = cms.uint32(40)
+    else:
+        process.TritonProducer.nodeMin = cms.uint32(100)
+        process.TritonProducer.nodeMax = cms.uint32(4000)
+        process.TritonProducer.edgeMin = cms.uint32(8000)
+        process.TritonProducer.edgeMax = cms.uint32(15000)
 
 # Let it run
 process.p = cms.Path(

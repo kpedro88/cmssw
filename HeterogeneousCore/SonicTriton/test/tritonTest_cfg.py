@@ -15,6 +15,7 @@ options.register("modelName","resnet50_netdef", VarParsing.multiplicity.singleto
 options.register("mode","PseudoAsync", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("verbose", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("unittest", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
+options.register("device","auto", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.parseArguments()
 
 if len(options.params)>0:
@@ -33,6 +34,12 @@ models = {
 if options.producer not in models:
     raise ValueError("Unknown producer: "+options.producer)
 
+# check devices
+options.device = options.device.lower()
+allowed_devices = ["auto","cpu","gpu"]
+if options.device not in allowed_devices:
+	raise ValueError("Unknown device: "+options.device)
+
 from Configuration.ProcessModifiers.enableSonicTriton_cff import enableSonicTriton
 process = cms.Process('tritonTest',enableSonicTriton)
 
@@ -44,6 +51,8 @@ process.source = cms.Source("EmptySource")
 
 process.TritonService.verbose = options.verbose
 process.TritonService.fallback.verbose = options.verbose
+if options.device != "auto":
+    process.TritonService.fallback.useGPU = options.device=="gpu"
 if len(options.address)>0:
     process.TritonService.servers.append(
         cms.PSet(
@@ -68,7 +77,7 @@ process.TritonProducer = cms.EDProducer(options.producer,
 if options.producer=="TritonImageProducer":
     process.TritonProducer.batchSize = cms.uint32(1)
     process.TritonProducer.topN = cms.uint32(5)
-    process.TritonProducer.imageList = cms.string("../data/models/resnet50_netdef/resnet50_labels.txt")
+    process.TritonProducer.imageList = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/resnet50_netdef/resnet50_labels.txt")
 elif options.producer=="TritonGraphProducer":
     if options.unittest:
         # reduce input size for unit test

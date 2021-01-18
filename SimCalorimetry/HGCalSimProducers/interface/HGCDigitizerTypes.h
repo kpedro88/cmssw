@@ -16,18 +16,6 @@ namespace hgc_digi {
 
   typedef std::array<HGCSimData_t, nSamples> HGCSimHitData;
 
-  typedef std::vector<HGCSimData_t> HGCSimDataCollection;
-  typedef std::array<HGCSimDataCollection, nSamples> PUSimHitData;
-
-  typedef std::vector<std::pair<float, float> > HitsRecordData;
-  typedef std::array<HitsRecordData, nSamples> HitsRecordForMultipleBxs;
-
-  struct HGCCellHitInfo {
-    std::array<PUSimHitData, 2> PUhit_info;
-    int thickness;
-    double size;
-    HitsRecordForMultipleBxs hitsRecord;
-  };
   struct HGCCellInfo {
     //1st array=energy, 2nd array=energy weighted time-of-flight
     std::array<HGCSimHitData, 2> hit_info;
@@ -36,6 +24,18 @@ namespace hgc_digi {
   };
 
   typedef std::unordered_map<uint32_t, HGCCellInfo> HGCSimHitDataAccumulator;
+  
+  //---------------- Data Structure for HGC-Premixing ------------------------
+  typedef std::vector<HGCSimData_t> HGCSimDataCollection;
+  typedef std::array<HGCSimDataCollection, nSamples> PUSimHitData;
+
+  struct HGCCellHitInfo {
+    std::array<PUSimHitData, 2> PUhit_info;
+    int thickness;
+    double size;
+    HGCSimData_t thisBx_accCharge_after_CellFireOff;
+  };
+  
   typedef std::unordered_map<uint32_t, HGCCellHitInfo> HGCPUSimHitDataAccumulator;
 }  // namespace hgc_digi
 #endif

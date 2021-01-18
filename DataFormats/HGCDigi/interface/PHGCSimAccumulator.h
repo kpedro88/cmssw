@@ -32,9 +32,14 @@ public:
     SimHitCollection() {}
     SimHitCollection(unsigned int nhits) : nhits_(nhits) {}
     SimHitCollection(const unsigned short si,
+		     const unsigned short accCharge)
+      : nhits_(1),accumulated_(true) {
+      accCharge_ = ((0 << energyOffset) | (si << sampleOffset) | accCharge);
+    }
+    SimHitCollection(const unsigned short si,
                      const std::vector<unsigned short>& accCharge,
                      const std::vector<unsigned short>& time)
-        : nhits_(accCharge.size()) {
+      : nhits_(accCharge.size()), accCharge_(0X0), accumulated_(false) {
       chargeArray_.reserve(nhits_);
       timeArray_.reserve(nhits_);
       for (size_t i = 0; i < nhits_; ++i) {
@@ -52,14 +57,24 @@ public:
     }
     SimHitCollection(const SimHitCollection& simhitcollection) = default;
     unsigned int nhits() const { return nhits_; }
-    unsigned int sampleIndex() const { return (chargeArray_[0] >> sampleOffset) & sampleMask; }
+    //bool isAccumulated() const { return accumulated_; }
+    unsigned int sampleIndex() const { 
+      if(!accumulated_) 
+	return (chargeArray_[0] >> sampleOffset) & sampleMask; 
+      else 
+	return (accCharge_ >> sampleOffset) & sampleMask;
+      
+    }
+    const bool isAccumulated() const { return accumulated_; }
     const std::vector<unsigned short>& chargeArray() const { return chargeArray_; }
     const std::vector<unsigned short>& timeArray() const { return timeArray_; }
-
+    const unsigned short accCharge() const { return accCharge_; }
   private:
     unsigned int nhits_;
     std::vector<unsigned short> chargeArray_;
     std::vector<unsigned short> timeArray_;
+    unsigned short accCharge_;
+    bool accumulated_;
   };
 
   PHGCSimAccumulator() = default;
@@ -76,12 +91,22 @@ public:
 
   void emplace_back(unsigned int detId,
                     unsigned short sampleIndex,
-                    const std::vector<unsigned short>& accCharge,
-                    const std::vector<unsigned short>& timing) {
+                    const std::vector<unsigned short>& accChargeArray,
+                    const std::vector<unsigned short>& timingArray) {
     if (detIdSize_.empty() || detIdSize_.back().detId() != detId) {
       detIdSize_.emplace_back(detId);
     }
-    simhitCollection_.emplace_back(sampleIndex, accCharge, timing);
+    simhitCollection_.emplace_back(sampleIndex, accChargeArray, timingArray);
+    detIdSize_.back().increaseSize();
+  }
+
+  void emplace_back(unsigned int detId,
+                    unsigned short sampleIndex,
+		    unsigned short accCharge) {
+    if (detIdSize_.empty() || detIdSize_.back().detId() != detId) {
+      detIdSize_.emplace_back(detId);
+    }
+    simhitCollection_.emplace_back(sampleIndex, accCharge);
     detIdSize_.back().increaseSize();
   }
 
@@ -92,6 +117,8 @@ public:
 
     unsigned int detId() const { return detId_; }
     unsigned short sampleIndex() const { return simhitcollection_.sampleIndex(); }
+    unsigned short accCharge() const { return simhitcollection_.accCharge(); }
+    bool isAccumulated() const { return simhitcollection_.isAccumulated(); }
     unsigned int nhits() const { return simhitcollection_.nhits(); }
     const std::vector<unsigned short> chargeArray() const { return simhitcollection_.chargeArray(); }
     const std::vector<unsigned short> timeArray() const { return simhitcollection_.timeArray(); }
@@ -141,8 +168,9 @@ public:
   const_iterator begin() const { return cbegin(); }
   const_iterator cend() const { return const_iterator(this, detIdSize_.size(), simhitCollection_.size()); }
   const_iterator end() const { return cend(); }
-
-private:
+  const size_t dSize() const {return detIdSize_.size();}
+  const size_t sSize() const {return simhitCollection_.size();}
+  private:
   std::vector<DetIdSize> detIdSize_;
   std::vector<SimHitCollection> simhitCollection_;
 };

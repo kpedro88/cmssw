@@ -69,6 +69,7 @@ void PreMixingHGCalWorker::put(edm::Event& e,
                                int bs) {
   edm::Service<edm::RandomNumberGenerator> rng;
   digitizer_.finalizeEvent(e, ES, &rng->getEngine(e.streamID()));
+  std::cout<<"PreMixingHGCalWorker put ends"<<std::endl;
 }
 
 DEFINE_PREMIXING_WORKER(PreMixingHGCalWorker);

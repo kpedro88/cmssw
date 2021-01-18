@@ -25,15 +25,19 @@ HGCDigiProducer::HGCDigiProducer(edm::ParameterSet const& pset, edm::ConsumesCol
 
 //
 void HGCDigiProducer::initializeEvent(edm::Event const& event, edm::EventSetup const& es) {
+  //std::cout<<"HGCDigiProducer::initializeEvent started"<<std::endl;
   edm::Service<edm::RandomNumberGenerator> rng;
   randomEngine_ = &rng->getEngine(event.streamID());
+  //std::cout<<"HGCDigiProducer::initializeEvent middle"<<std::endl;
   theDigitizer_.initializeEvent(event, es);
+  //std::cout<<"HGCDigiProducer::initializeEvent ended"<<std::endl;
 }
 
 //
 void HGCDigiProducer::finalizeEvent(edm::Event& event, edm::EventSetup const& es) {
   theDigitizer_.finalizeEvent(event, es, randomEngine_);
   randomEngine_ = nullptr;  // to precent access outside event
+  //std::cout<<"HGCDigiProducer finalizeEvent ended"<<std::endl;
 }
 
 //

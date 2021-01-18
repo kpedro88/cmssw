@@ -659,11 +659,16 @@ namespace edm {
   }
 
   void MixingModule::initializeEvent(edm::Event const& event, edm::EventSetup const& setup) {
+    std::cout<<"MixingModule::initializeEvent started"<<std::endl;
+    int count = 0;
     for (Accumulators::const_iterator accItr = digiAccumulators_.begin(), accEnd = digiAccumulators_.end();
          accItr != accEnd;
          ++accItr) {
       (*accItr)->initializeEvent(event, setup);
+      std::cout<<count<<std::endl;
+      count++;
     }
+    std::cout<<"MixingModule::initializeEvent ended"<<std::endl;
   }
 
   void MixingModule::accumulateEvent(edm::Event const& event, edm::EventSetup const& setup) {
@@ -685,10 +690,15 @@ namespace edm {
   }
 
   void MixingModule::finalizeEvent(edm::Event& event, edm::EventSetup const& setup) {
+    std::cout<<"MixingModule finalizeEvent started"<<std::endl;
+    int count = 0;
     for (Accumulators::const_iterator accItr = digiAccumulators_.begin(), accEnd = digiAccumulators_.end();
          accItr != accEnd;
          ++accItr) {
       (*accItr)->finalizeEvent(event, setup);
+      std::cout<<count<<std::endl;
+      count++;
     }
+    std::cout<<"MixingModule finalizeEvent ended"<<std::endl;
   }
 }  // namespace edm

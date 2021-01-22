@@ -7,8 +7,8 @@ This example demonstrates how to run the particle reconstruction in the HGCAL su
 Install CMSSW:
 ```
 export SCRAM_ARCH="slc7_amd64_gcc820"
-cmsrel CMSSW_11_1_0_pre7
-cd CMSSW_11_1_0_pre7/src
+cmsrel CMSSW_11_2_0_pre9
+cd CMSSW_11_2_0_pre9/src
 cmsenv
 scram b -j 8
 ```
@@ -16,7 +16,7 @@ scram b -j 8
 Install custom packages: 
 ```
 git cms-init
-git cms-merge-topic cms-pepr:pepr_CMSSW_11_1_0_pre7
+git cms-merge-topic cms-pepr:pepr_CMSSW_11_2_0_pre9
 scram b -j 8
 ```
 
@@ -53,23 +53,13 @@ The inference of trained graph neural network models is done by sending the rech
 and retrieving the regressed energy and position of clustered particle candidates. 
 These candidates are subsequently turned into a PFcandidate collection named `recoPFCandidates_peprCandidateFromHitProducer__RECO`. Particle and charge identification as well as track-cluster matching are work in progress and not included yet. 
 
-**Note:** it may take some time for the first event in the reconstruction to start. The messages printed during that time will be:
-
-```
-INFO:    Convert SIF file to sandbox...
-...
-Checking if pipe is open...
-```
-The speed of communication with the client and launching it will drastically improve with a next CMSSW update, where the new version of the client will be included directly in CMSSW. 
-Moreover, also the inference time on each event will improve by orders of magnitude once dedicated Triton GPU servers are used. Right now, with only a CPU triton server, it is not advised to process full events, this will take multiple minutes.
+The inference time on each event will improve by orders of magnitude once dedicated Triton GPU servers are used. Right now, with only a CPU triton server, it is not advised to process full events, this will take multiple minutes.
 
 
 The **sequence** of the producer module is as follows:
-* In the constructor of the producer, the Triton client is started.
-* The producer checks for open pipes (set up to communicate with the Triton server) and will wait until the pipes are open to send the rechit data to the server.
-* In case the pipes are open before the producer reaches the check, the client will wait until the rechit data is passed from the producer.
-* The inference itself is done on the Triton server via the trained model that is stored there, and the results are passed back to the module where a collection of reconstructed particle candidates is created.
-* The Triton client is automatically closed in the destructor of the producer
+* The producer sends the rechit data to the Triton server.
+* The inference itself is done on the server via the trained model that is stored there
+* The results are passed back to the module where a collection of reconstructed particle candidates is created.
 
 ### Adding the peprCandidateFromHitProducer to your favorite RECO config
 

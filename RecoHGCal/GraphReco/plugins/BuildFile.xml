@@ -1,0 +1,11 @@
+<use name="DataFormats/Candidate"/>
+<use name="DataFormats/GeometryVector"/>
+<use name="DataFormats/HGCRecHit"/>
+<use name="DataFormats/Math"/>
+<use name="DataFormats/ParticleFlowCandidate"/>
+<use name="FWCore/Framework"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/Utilities"/>
+<use name="HeterogeneousCore/SonicTriton"/>
+<use name="RecoLocalCalo/HGCalRecAlgos"/>
+<flags EDM_PLUGIN="1"/>

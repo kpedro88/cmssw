@@ -4,7 +4,7 @@
 USEDOCKER=""
 GPU=""
 VERBOSE=""
-VERBOSE_ARGS="--log-verbose=1 --log-error=1 --log-info=1"
+VERBOSE_ARGS="--log-verbose=1 --log-error=1 --log-warning=1 --log-info=1"
 WTIME=120
 SERVER=triton_server_instance
 RETRIES=3
@@ -20,6 +20,7 @@ AUTOPORT=""
 NPORTS=3
 IMAGE=fastml/triton-torchgeo:20.09-py3-geometric
 SANDBOX=/cvmfs/unpacked.cern.ch/registry.hub.docker.com/${IMAGE}
+EXTRA="--backend-config=tensorflow,version=2"
 
 usage() {
 	ECHO="echo -e"
@@ -42,6 +43,7 @@ usage() {
 	$ECHO "-t [dir]    \t non-default hidden temporary dir"
 	$ECHO "-v          \t (verbose) start: activate server debugging info; stop: keep server logs"
 	$ECHO "-w [time]   \t maximum time to wait for server to start (default: ${WTIME} seconds)"
+	$ECHO "-x [args]   \t extra args to pass to tritonserver (should be quoted)"
 	$ECHO "-h          \t print this message and exit"
 	$ECHO
 	$ECHO "Operations:"
@@ -56,7 +58,7 @@ if [ -e /run/shm ]; then
 	SHM=/run/shm
 fi
 
-while getopts "cDdfgi:M:m:n:P:p:r:s:t:vw:h" opt; do
+while getopts "cDdfgi:M:m:n:P:p:r:s:t:vw:x:h" opt; do
 	case "$opt" in
 		c) CLEANUP=""
 		;;
@@ -90,6 +92,8 @@ while getopts "cDdfgi:M:m:n:P:p:r:s:t:vw:h" opt; do
 		;;
 		w) WTIME="$OPTARG"
 		;;
+		x) EXTRA="$EXTRA $OPTARG"
+		;;
 		h) usage 0
 		;;
 	esac
@@ -121,7 +125,8 @@ STOPLOG="log_stop_${SERVER}.log"
 LIB=lib
 STARTED_INDICATOR="Started GRPCInferenceService"
 SEGFAULT_INDICATOR="Address already in use"
-EXTRA=""
+GPUARG=""
+PRELOADS=""
 
 compute_ports(){
 	# compute derived port numbers
@@ -178,8 +183,9 @@ start_docker(){
 
 	$DRYRUN $DOCKER run -d --name ${SERVER} \
 		--shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
-		-p${HTTPPORT}:${HTTPPORT} -p${GRPCPORT}:${GRPCPORT} -p${METRPORT}:${METRPORT} $EXTRA $MOUNTARGS \
-		${IMAGE} tritonserver $PORTARGS $REPOARGS $VERBOSE
+		-p${HTTPPORT}:${HTTPPORT} -p${GRPCPORT}:${GRPCPORT} -p${METRPORT}:${METRPORT} $GPUARG $MOUNTARGS \
+		--env LD_LIBRARY_PATH="/opt/tritonserver/backends/tensorflow2:/opt/tritonserver/lib/pytorch:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64" $PRELOADS \
+		${IMAGE} tritonserver $EXTRA $PORTARGS $REPOARGS $VERBOSE
 }
 
 start_singularity(){
@@ -200,7 +206,7 @@ start_singularity(){
 	# start instance
 	# need to bind /cvmfs for above symlinks to work inside container
 	$DRYRUN singularity instance start \
-		-B ${SHM}:/run/shm -B ${LIB}:/opt/tritonserver/lib -B ${SANDBOX} $MOUNTARGS $EXTRA \
+		-B ${SHM}:/run/shm -B ${LIB}:/opt/tritonserver/lib -B ${SANDBOX} $MOUNTARGS $GPUARG \
 		${SANDBOX} ${SERVER}
 
 	START_EXIT=$?
@@ -215,8 +221,10 @@ start_singularity(){
 	else
 		REDIR=/dev/stdout
 	fi
-	$DRYRUN singularity run instance://${SERVER} \
-		tritonserver $PORTARGS $REPOARGS $VERBOSE >& ${REDIR} &
+	$DRYRUN singularity run \
+		--env LD_LIBRARY_PATH="/opt/tritonserver/backends/tensorflow2:/opt/tritonserver/lib/pytorch:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64" $PRELOADS \
+		instance://${SERVER} \
+		tritonserver $EXTRA $PORTARGS $REPOARGS $VERBOSE >& ${REDIR} &
 	[ -z "$DRYRUN" ] || wait
 }
 
@@ -288,6 +296,20 @@ list_models(){
 	done
 	# make unique list
 	read -a REPOS <<< "$(printf "%s\n" "${REPOS[@]}" | sort -u | tr '\n' ' ')"
+	# make list of shared libraries containing custom ops
+	shopt -s nullglob
+	for REPO in ${REPOS[@]}; do
+		for MODEL in ${REPO}/*/; do
+			for OPLIB in ${MODEL}/*.so; do
+				if [ -n "$OPLIB" ]; then
+					PRELOADS="${PRELOADS:+$PRELOADS }$(readlink -f $OPLIB)"
+				fi
+			done
+		done
+	done
+	if [ -n "$PRELOADS" ]; then
+		PRELOADS='--env LD_PRELOAD='"$PRELOADS"
+	fi
 }
 
 auto_stop(){
@@ -353,7 +375,7 @@ make_tmp(){
 
 if [ -n "$USEDOCKER" ]; then
 	if [ -n "$GPU" ]; then
-		EXTRA="--gpus all"
+		GPUARG="--gpus all"
 	fi
 	START_FN=start_docker
 	TEST_FN=test_docker
@@ -361,7 +383,7 @@ if [ -n "$USEDOCKER" ]; then
 	PROG_NAME=Docker
 else
 	if [ -n "$GPU" ]; then
-		EXTRA="--nv"
+		GPUARG="--nv"
 	fi
 	START_FN=start_singularity
 	TEST_FN=test_singularity

@@ -100,6 +100,7 @@ The script has two operations (`start` and `stop`) and the following options:
 * `-t [dir]`: non-default hidden temporary dir
 * `-v`: (verbose) start: activate server debugging info; stop: keep server logs
 * `-w [time]`: maximum time to wait for server to start (default: 120 seconds)
+* `-x [args]`: extra args to pass to tritonserver (should be quoted)
 * `-h`: print help message and exit
 
 Additional details and caveats:

@@ -1,0 +1,11 @@
+FROM nvcr.io/nvidia/tensorflow:20.09-tf2-py3 AS builder
+
+COPY HGCalML /workspace/HGCalML
+
+RUN cd /workspace
+RUN TF_ROOT=/usr/local/lib/python3.6/dist-packages/tensorflow &&\
+    CUDA_LINK=include/third_party/gpus &&\
+    mkdir -p ${TF_ROOT}/${CUDA_LINK} &&\
+    ln -sf /usr/local/cuda ${TF_ROOT}/${CUDA_LINK}/cuda
+RUN pushd /workspace/HGCalML/modules/compiled && make -f /workspace/HGCalML/triton/Makefile_modules && cp libpeprops.so /workspace/ && popd
+

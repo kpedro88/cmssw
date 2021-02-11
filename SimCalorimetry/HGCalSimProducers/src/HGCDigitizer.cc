@@ -111,8 +111,7 @@ namespace {
                                        const float minCharge,
                                        const float maxCharge,
 				       const std::string digiCollection) {
-    //std::cout<<"save started"<<std::endl;
-    //std::cout<<"============================================="<<std::endl;
+    
     constexpr auto nEnergies = std::tuple_size<decltype(hgc_digi::HGCCellHitInfo().PUhit_info)>::value;
     static_assert(nEnergies <= PHGCSimAccumulator::SimHitCollection::energyMask + 1,
                   "PHGCSimAccumulator bit pattern needs to updated");
@@ -121,7 +120,7 @@ namespace {
     const float minPackChargeLog = minCharge > 0.f ? std::log(minCharge) : -2;
     const float maxPackChargeLog = std::log(maxCharge);
     constexpr uint16_t base = 1 << PHGCSimAccumulator::SimHitCollection::sampleOffset;
-    //std::cout<<"here 1"<<std::endl;
+    
     simResult.reserve(simData.size());
     int count = 0;
     for (const auto& id : validIds) {
@@ -147,13 +146,13 @@ namespace {
 	      vt.emplace_back(t);
 	    }
 	  }
-	  //std::cout<<"here 3 in loop"<<std::endl;
+	  
 	  simResult.emplace_back(id.rawId(), iSample, vc, vt);
 	  float accCharge_thisBx = found->second.thisBx_accCharge_after_CellFireOff;
 	  if(accCharge_thisBx > minCharge) {
 	    unsigned short c = logintpack::pack16log(accCharge_thisBx, minPackChargeLog, maxPackChargeLog, base);
 	    simResult.emplace_back(id.rawId(), iSample, c);
-	    //std::cout<<iSample<<"\t"<<accCharge_thisBx<<std::endl;
+	    
 	  }
 	} else {
 	  
@@ -170,13 +169,13 @@ namespace {
 	  if(accCharge_outOfTime > minCharge) {
 	    unsigned short c = logintpack::pack16log(accCharge_outOfTime, minPackChargeLog, maxPackChargeLog, base);
 	    simResult.emplace_back(id.rawId(), iSample, c);
-	    //std::cout<<iSample<<"\t"<<accCharge_outOfTime<<std::endl;
+	    
 	  }
 	}
       }
     }
-    std::cout<<"save ended "<<simResult.dSize()<<"\t"<<simResult.sSize()<<"\t"<<digiCollection<<std::endl;
-    std::cout<<sizeof(PHGCSimAccumulator)<<std::endl;
+    
+    
     simResult.shrink_to_fit();
   }
 
@@ -192,7 +191,7 @@ namespace {
                                        const bool minbiasFlag,
                                        std::unordered_map<uint32_t, bool>& hitOrder_monitor,
                                        const unsigned int thisBx) {
-    //std::cout<<"load started"<<std::endl;
+    
     const float minPackChargeLog = minCharge > 0.f ? std::log(minCharge) : -2;
     const float maxPackChargeLog = std::log(maxCharge);
     constexpr uint16_t base = 1 << PHGCSimAccumulator::SimHitCollection::sampleOffset;
@@ -212,10 +211,6 @@ namespace {
         unsigned short iSample = detIdIndexHitInfo.sampleIndex();
 	
 	bool is_accumulated = detIdIndexHitInfo.isAccumulated();
-	
-        
-        
-	//std::cout<<iSample<<std::endl;
         float p_charge, p_time;
         unsigned short unsigned_charge, unsigned_time;
 	if(is_accumulated == false && iSample == (unsigned short)thisBx) {
@@ -310,7 +305,6 @@ namespace {
       //}
 
       }*/
-    std::cout<<"@@@@ "<<simData.size()<<std::endl;
   }
   
 }  //namespace
@@ -385,22 +379,20 @@ HGCDigitizer::HGCDigitizer(const edm::ParameterSet& ps, edm::ConsumesCollector& 
 //
 void HGCDigitizer::initializeEvent(edm::Event const& e, edm::EventSetup const& es) {
   // reserve memory for a full detector
-  std::cout<<"initializeEvent started"<<std::endl;
+  
   unsigned idx = getType();
   simHitAccumulator_->reserve(averageOccupancies_[idx] * validIds_.size());
   pusimHitAccumulator_->reserve(averageOccupancies_[idx] * validIds_.size());
-  //std::cout<<"initializeEvent ended"<<std::endl;
+  
 }
 
 //
 void HGCDigitizer::finalizeEvent(edm::Event& e, edm::EventSetup const& es, CLHEP::HepRandomEngine* hre) {
-  //std::cout<<"gheu"<<std::endl;
+  
   hitRefs_bx0.clear();
   PhitRefs_bx0.clear();
   hitOrder_monitor.clear();
-  //std::cout<<"hoo"<<std::endl;
   //accCharge_after_cellFireOff_bx0.clear();
-  //std::cout<<"finalizeEvent started"<<std::endl;
   const CaloSubdetectorGeometry* theGeom = (nullptr == gHGCal_ ? static_cast<const CaloSubdetectorGeometry*>(gHcal_)
                                                                : static_cast<const CaloSubdetectorGeometry*>(gHGCal_));
 
@@ -421,23 +413,19 @@ void HGCDigitizer::finalizeEvent(edm::Event& e, edm::EventSetup const& es, CLHEP
   
   if (premixStage1_) {
     auto simRecord = std::make_unique<PHGCSimAccumulator>();
-    //std::cout<<"premixStage1_ "<<premixStage1_<<std::endl;
+    
     if (!pusimHitAccumulator_->empty()) {
       saveSimHitAccumulator_forPreMix(
 				      *simRecord, *pusimHitAccumulator_, validIds_, 
 				      premixStage1MinCharge_, premixStage1MaxCharge_, digiCollection_);
-      std::cout<<"*** "<<pusimHitAccumulator_->size()<<std::endl;
     }
-    //std::cout<<"before putting"<<std::endl;
+    
     e.put(std::move(simRecord), digiCollection());
-    //std::cout<<"after putting"<<std::endl;
+    
   } else {
-    std::cout<<"else*** "<<simHitAccumulator_->size()<<std::endl;
     if (producesEEDigis()) {
       
       auto digiResult = std::make_unique<HGCalDigiCollection>();
-      
-      
       theHGCEEDigitizer_->run(digiResult, *simHitAccumulator_, theGeom, validIds_, digitizationType_, hre);
       
       edm::LogVerbatim("HGCDigitizer") << "HGCDigitizer:: finalize event - produced " << digiResult->size()
@@ -475,21 +463,21 @@ void HGCDigitizer::finalizeEvent(edm::Event& e, edm::EventSetup const& es, CLHEP
 #ifdef EDM_ML_DEBUG
       checkPosition(&(*digiResult));
 #endif
-      //std::cout<<"before putting"<<std::endl;
+      
       e.put(std::move(digiResult), digiCollection());
-      //std::cout<<"after putting"<<std::endl;
+      
     }
   }
-  //std::cout<<"before swap"<<std::endl;
+  
   hgc::HGCSimHitDataAccumulator().swap(*simHitAccumulator_);
   hgc::HGCPUSimHitDataAccumulator().swap(*pusimHitAccumulator_);
-  //std::cout<<"after swap "<<digiCollection_<<std::endl;
+  
 }
 void HGCDigitizer::accumulate_forPreMix(edm::Event const& e,
                                         edm::EventSetup const& eventSetup,
                                         CLHEP::HepRandomEngine* hre) {
   //get inputs
-  //std::cout<<"accumulate_forPreMix Event"<<std::endl;
+  
   edm::Handle<edm::PCaloHitContainer> hits;
   e.getByLabel(edm::InputTag("g4SimHits", hitCollection_), hits);
   if (!hits.isValid()) {
@@ -532,7 +520,7 @@ void HGCDigitizer::accumulate(edm::Event const& e, edm::EventSetup const& eventS
 void HGCDigitizer::accumulate_forPreMix(PileUpEventPrincipal const& e,
                                         edm::EventSetup const& eventSetup,
                                         CLHEP::HepRandomEngine* hre) {
-  //std::cout<<"accumulate_forPreMix PileUpEventPrincipal"<<std::endl;
+  
   edm::Handle<edm::PCaloHitContainer> hits;
   e.getByLabel(edm::InputTag("g4SimHits", hitCollection_), hits);
 
@@ -581,7 +569,7 @@ void HGCDigitizer::accumulate_forPreMix(edm::Handle<edm::PCaloHitContainer> cons
                                         CLHEP::HepRandomEngine* hre) {
   if (nullptr == geom)
     return;
-  //std::cout<<"accumulate_forPreMix PCaloHitContainer"<<std::endl;
+  
   //configuration to apply for the computation of time-of-flight
   std::array<float, 3> tdcForToAOnset{{0.f, 0.f, 0.f}};
   float keV2fC(0.f);
@@ -710,7 +698,7 @@ void HGCDigitizer::accumulate_forPreMix(edm::Handle<edm::PCaloHitContainer> cons
   
   
   //accCharge_after_cellFireOff_bx0.clear();
-  //std::cout<<"accumulate_forPreMix PCaloHitContainer ended"<<std::endl;
+  
 }
 
 //

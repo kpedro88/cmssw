@@ -104,7 +104,7 @@ namespace edm {
 
         LogInfo("MixingModule") << "Will mix " << object << "s with InputTag= " << tag.encode() << ", label will be "
                                 << label;
-        //            std::cout <<"Will mix "<<object<<"s with InputTag= "<<tag.encode()<<", label will be "<<label<<std::endl;
+        
 
       } else if (object == "RecoTrack") {
         InputTag tag;
@@ -126,7 +126,7 @@ namespace edm {
 
         LogInfo("MixingModule") << "Will mix " << object << "s with InputTag= " << tag.encode() << ", label will be "
                                 << label;
-        //std::cout <<"Will mix "<<object<<"s with InputTag= "<<tag.encode()<<", label will be "<<label<<std::endl;
+        
 
       } else if (object == "SimVertex") {
         InputTag tag;
@@ -146,7 +146,7 @@ namespace edm {
 
         LogInfo("MixingModule") << "Will mix " << object << "s with InputTag " << tag.encode() << ", label will be "
                                 << label;
-        //            std::cout <<"Will mix "<<object<<"s with InputTag "<<tag.encode()<<", label will be "<<label<<std::endl;
+        
 
       } else if (object == "HepMCProduct") {
         InputTag tag;
@@ -165,7 +165,7 @@ namespace edm {
 
         LogInfo("MixingModule") << "Will mix " << object << "s with InputTag= " << tag.encode() << ", label will be "
                                 << label;
-        //            std::cout <<"Will mix "<<object<<"s with InputTag= "<<tag.encode()<<", label will be "<<label<<std::endl;
+        
         for (size_t i = 1; i < tags.size(); ++i) {
           InputTag fallbackTag = tags[i];
           std::string fallbackLabel;
@@ -198,7 +198,7 @@ namespace edm {
 
           LogInfo("MixingModule") << "Will mix " << object << "s with InputTag= " << tag.encode() << ", label will be "
                                   << label;
-          //              std::cout <<"Will mix "<<object<<"s with InputTag= "<<tag.encode()<<", label will be "<<label<<std::endl;
+          
         }
 
       } else if (object == "PSimHit") {
@@ -240,7 +240,7 @@ namespace edm {
 
           LogInfo("MixingModule") << "Will mix " << object << "s with InputTag= " << tag.encode() << ", label will be "
                                   << label;
-          //              std::cout <<"Will mix "<<object<<"s with InputTag= "<<tag.encode()<<", label will be "<<label<<std::endl;
+          
         }
       } else {
         LogWarning("MixingModule")
@@ -381,7 +381,7 @@ namespace edm {
 
     for (auto const& worker : workers_) {
       LogDebug("MixingModule") << " merging Event:  id " << eventPrincipal.id();
-      //      std::cout <<"PILEALLWORKERS merging Event:  id " << eventPrincipal.id() << std::endl;
+      
 
       worker->addPileups(eventPrincipal, &moduleCallingContext, eventId);
     }
@@ -487,7 +487,7 @@ namespace edm {
     }
 
     //    for (int bunchIdx = minBunch_; bunchIdx <= maxBunch_; ++bunchIdx) {
-    //  std::cout << " bunch ID, Pileup, True " << bunchIdx << " " << PileupList[bunchIdx-minBunch_] << " " <<  TrueNumInteractions_[bunchIdx-minBunch_] << std::endl;
+    
     //}
 
     for (int bunchIdx = minBunch_; bunchIdx <= maxBunch_; ++bunchIdx) {
@@ -659,7 +659,7 @@ namespace edm {
   }
 
   void MixingModule::initializeEvent(edm::Event const& event, edm::EventSetup const& setup) {
-    std::cout<<"MixingModule::initializeEvent started"<<std::endl;
+    
     int count = 0;
     for (Accumulators::const_iterator accItr = digiAccumulators_.begin(), accEnd = digiAccumulators_.end();
          accItr != accEnd;
@@ -668,7 +668,7 @@ namespace edm {
       std::cout<<count<<std::endl;
       count++;
     }
-    std::cout<<"MixingModule::initializeEvent ended"<<std::endl;
+    
   }
 
   void MixingModule::accumulateEvent(edm::Event const& event, edm::EventSetup const& setup) {
@@ -690,7 +690,7 @@ namespace edm {
   }
 
   void MixingModule::finalizeEvent(edm::Event& event, edm::EventSetup const& setup) {
-    std::cout<<"MixingModule finalizeEvent started"<<std::endl;
+    
     int count = 0;
     for (Accumulators::const_iterator accItr = digiAccumulators_.begin(), accEnd = digiAccumulators_.end();
          accItr != accEnd;
@@ -699,6 +699,6 @@ namespace edm {
       std::cout<<count<<std::endl;
       count++;
     }
-    std::cout<<"MixingModule finalizeEvent ended"<<std::endl;
+    
   }
 }  // namespace edm

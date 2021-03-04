@@ -33,9 +33,9 @@ namespace trackerDTC {
 
     const double y = (col_ + .5) * setup.baseCol() * sm->pitchCol();
     // radius of a column of strips/pixel in cm
-    d_ = sm->r() + y * sm->sin();
+    d_ = sm->r() + y * sm->sinTilt();
     // stub z in cm
-    z_ = digi(sm->z() + y * sm->cos(), setup.baseZ());
+    z_ = digi(sm->z() + y * sm->cosTilt(), setup.baseZ());
 
     const double x0 = rowLUT_ * setup.baseRow() * setup.dtcNumMergedRows() * sm->pitchRow();
     const double x1 = (rowLUT_ + 1) * setup.baseRow() * setup.dtcNumMergedRows() * sm->pitchRow();
@@ -80,7 +80,7 @@ namespace trackerDTC {
     r_ = digi(r_ - chosenRofPhi, setup.baseR());
 
     // radial (cylindrical) component of sensor separation
-    const double dr = sm->sep() / (sm->cos() - sm->sin() * z_ / d_);
+    const double dr = sm->sep() / (sm->cosTilt() - sm->sinTilt() * z_ / d_);
     // converts bend into qOverPt in 1/cm
     const double qOverPtOverBend = sm->pitchRow() / dr / d_;
     // qOverPt in 1/cm
@@ -131,9 +131,9 @@ namespace trackerDTC {
 
     // encode bend
     const vector<double>& encodingBend = setup.encodingBend(sm->windowSize(), sm->psModule());
-    const auto pos = find(encodingBend.begin(), encodingBend.end(), abs(bend_));
+    const auto pos = find(encodingBend.begin(), encodingBend.end(), abs(ttStubRef->bendBE()));
     const int uBend = distance(encodingBend.begin(), pos);
-    bend_ = pow(-1, signbit(bend_)) * (uBend - (int)encodingBend.size() / 2);
+    bend_ = pow(-1, signbit(bend_)) * uBend;
   }
 
   // returns bit accurate representation of Stub
@@ -148,15 +148,15 @@ namespace trackerDTC {
   // returns 64 bit stub in hybrid data format
   TTDTC::BV Stub::formatHybrid(int region) const {
     const SensorModule::Type type = sm_->type();
-    // stub phi w.r.t. processing region centre in rad
-    const double phi = phi_ - (region - .5) * setup_->baseRegion();
+    // stub phi w.r.t. processing region border in rad
+    double phi = phi_ - (region - .5) * setup_->baseRegion() + setup_->hybridRangePhi() / 2.;
     // convert stub variables into bit vectors
     const TTBV hwR(r_, setup_->hybridBaseR(type), setup_->hybridWidthR(type), true);
     const TTBV hwPhi(phi, setup_->hybridBasePhi(type), setup_->hybridWidthPhi(type), true);
     const TTBV hwZ(z_, setup_->hybridBaseZ(type), setup_->hybridWidthZ(type), true);
     const TTBV hwAlpha(row_, setup_->hybridBaseAlpha(type), setup_->hybridWidthAlpha(type), true);
     const TTBV hwBend(bend_, setup_->hybridWidthBend(type), true);
-    const TTBV hwLayer(sm_->encodedLayerId(), setup_->hybridWidthLayer());
+    const TTBV hwLayer(sm_->encodedLayerId(), setup_->hybridWidthLayerId());
     const TTBV hwGap(0, setup_->hybridNumUnusedBits(type));
     const TTBV hwValid(1, 1);
     // assemble final bitset
@@ -218,7 +218,7 @@ namespace trackerDTC {
     // convert stub variables into bit vectors
     const TTBV hwValid(1, 1);
     const TTBV hwGap(0, setup_->dtcNumUnusedBits());
-    const TTBV hwLayer(layer, setup_->widthLayer());
+    const TTBV hwLayer(layer, setup_->widthLayerId());
     const TTBV hwSectorEtaMin(setcorEta.first, setup_->widthSectorEta());
     const TTBV hwSectorEtaMax(setcorEta.second, setup_->widthSectorEta());
     const TTBV hwR(r_, setup_->baseR(), setup_->widthR(), true);
@@ -229,10 +229,8 @@ namespace trackerDTC {
     TTBV hwSectorPhis(0, setup_->numSectorsPhi());
     for (int sectorPhi = 0; sectorPhi < setup_->numSectorsPhi(); sectorPhi++)
       hwSectorPhis[sectorPhi] = sectorsPhi[region * setup_->numSectorsPhi() + sectorPhi];
-    // assemble final bitsetTTDTC::BV(hwGap.str() + hwValid.str() + hwR.str() + hwPhi.str() + hwZ.str() + hwQoverPtMin.str() +
-    return TTDTC::BV(hwGap.str() + hwValid.str() + hwR.str() + hwPhi.str() + hwZ.str() + hwQoverPtMin.str() +
-                     hwQoverPtMax.str() + hwSectorEtaMin.str() + hwSectorEtaMax.str() + hwSectorPhis.str() +
-                     hwLayer.str());
+    // assemble final bitset
+    return TTDTC::BV(hwGap.str() + hwValid.str() + hwR.str() + hwPhi.str() + hwZ.str() + hwLayer.str() + hwSectorPhis.str() + hwSectorEtaMin.str() + hwSectorEtaMax.str() + hwQoverPtMin.str() + hwQoverPtMax.str());
   }
 
 }  // namespace trackerDTC

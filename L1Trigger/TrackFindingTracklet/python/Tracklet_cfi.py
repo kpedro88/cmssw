@@ -11,6 +11,7 @@ TTTracksFromTrackletEmulation = cms.EDProducer("L1FPGATrackProducer",
                                                BeamSpotSource = cms.InputTag("offlineBeamSpot"),
                                                asciiFileName = cms.untracked.string(""),
                                                # (if running on CRAB use "../../fitpattern.txt" etc instead)
+                                               Fakefit = cms.bool(False),
                                                Extended=cms.bool(False),
                                                Hnpar=cms.uint32(4),
                                                fitPatternFile  = cms.FileInPath('L1Trigger/TrackFindingTracklet/data/fitpattern.txt'),

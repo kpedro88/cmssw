@@ -18,6 +18,9 @@
 #include "DataFormats/L1TrackTrigger/interface/TTStub.h"
 #include "DataFormats/L1TrackTrigger/interface/TTTrack.h"
 #include "DataFormats/L1TrackTrigger/interface/TTTrack_TrackWord.h"
+#include "DataFormats/L1TrackTrigger/interface/TTBV.h"
+
+#include <bitset>
 
 /// The reference types
 typedef edm::Ref<edm::DetSetVector<Phase2TrackerDigi>, Phase2TrackerDigi> Ref_Phase2TrackerDigi_;
@@ -29,5 +32,16 @@ typedef edm::Ref<TTStubDetSetVec, TTStub<Ref_Phase2TrackerDigi_> > TTStubRef;
 typedef edm::Ref<TTClusterDetSetVec, TTCluster<Ref_Phase2TrackerDigi_> > TTClusterRef;
 
 typedef edmNew::DetSet<TTStub<Ref_Phase2TrackerDigi_> > TTStubDetSet;
+typedef edmNew::DetSet<TTCluster<Ref_Phase2TrackerDigi_> > TTClusterDetSet;
+
+typedef edm::Ref<std::vector<TTTrack<Ref_Phase2TrackerDigi_>>, TTTrack<Ref_Phase2TrackerDigi_>> TTTrackRef;
+typedef std::vector<TTTrackRef> TTTrackRefs;
+typedef std::pair<TTTrackRef, std::bitset<TTBV::S>> FrameTrack;
+typedef std::vector<FrameTrack> StreamTrack;
+typedef std::vector<StreamTrack> StreamsTrack;
+
+typedef std::vector<TTTrack<Ref_Phase2TrackerDigi_>> TTTracks;
+
+typedef std::map<TTTrackRef, TTTrackRef> TTTrackMap;
 
 #endif

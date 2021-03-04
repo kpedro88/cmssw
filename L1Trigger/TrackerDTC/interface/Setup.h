@@ -17,13 +17,15 @@
 #include "L1Trigger/TrackTrigger/interface/TTStubAlgorithm_official.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "CondFormats/SiPhase2TrackerObjects/interface/TrackerDetToDTCELinkCablingMap.h"
+#include "SimTracker/Common/interface/TrackingParticleSelector.h"
 
-#include "DataFormats/L1TrackTrigger/interface/TTTypes.h"
+#include "SimTracker/TrackTriggerAssociation/interface/TTTypes.h"
 #include "DataFormats/L1TrackTrigger/interface/TTDTC.h"
 #include "L1Trigger/TrackerDTC/interface/SetupRcd.h"
 #include "L1Trigger/TrackerDTC/interface/SensorModule.h"
 
 #include <vector>
+#include <set>
 #include <unordered_map>
 
 namespace trackerDTC {
@@ -65,6 +67,8 @@ namespace trackerDTC {
     int dtcId(int tfpRegion, int tfpChannel) const;
     // checks if given dtcId is connected to PS or 2S sensormodules
     bool psModule(int dtcId) const;
+    // checks if given dtcId is connected via 10 gbps link
+    bool gbps10(int dtcId) const;
     // checks if given dtcId is connected to -z (false) or +z (true)
     bool side(int dtcId) const;
     // ATCA slot number [0-11] of given dtcId
@@ -81,6 +85,36 @@ namespace trackerDTC {
     GlobalPoint stubPos(const TTStubRef& ttStubRef) const;
     // empty trackerDTC EDProduct
     TTDTC ttDTC() const { return TTDTC(numRegions_, numOverlappingRegions_, numDTCsPerRegion_); }
+    // checks if stub collection is considered forming a reconstructable track 
+    bool reconstructable(const std::vector<TTStubRef>& ttStubRefs) const;
+    // checks if tracking particle is selected for efficiency measurements
+    bool useForAlgEff(const TrackingParticle& tp) const;
+    //
+    bool useForReconstructable(const TrackingParticle& tp) const { return tpSelectorLoose_(tp); }
+    //
+    int layerId(const TTStubRef& ttStubRef) const;
+    //
+    int barrel(const TTStubRef& ttStubRef) const;
+    //
+    int psModule(const TTStubRef& ttStubRef) const;
+    //
+    TTBV layerMap(const std::vector<int>& ints) const;
+    //
+    TTBV layerMap(const TTBV& hitPattern, const std::vector<int>& ints) const;
+    //
+    std::vector<int> layerMap(const TTBV& hitPattern, const TTBV& ttBV) const;
+    //
+    std::vector<int> layerMap(const TTBV& ttBV) const;
+    //
+    double dZ(const TTStubRef& ttStubRef, double cot) const;
+    //
+    double v1(const TTStubRef& ttStubRef, double cot) const;
+    //
+    double dPhi(const TTStubRef& ttStubRef, double qOverPt) const;
+    //
+    double v0(const TTStubRef& ttStubRef, double qOverPt) const;
+    //
+    const std::vector<SensorModule>& sensorModules() const { return sensorModules_; }
 
     // Common track finding parameter
 
@@ -88,6 +122,8 @@ namespace trackerDTC {
     double beamWindowZ() const { return beamWindowZ_; }
     // number of frames betwen 2 resets of 18 BX packets
     int numFrames() const { return numFrames_; }
+    // number of frames needed per reset
+    int numFramesInfra() const { return numFramesInfra_; }
     // number of valid frames per 18 BX packet
     int numFramesIO() const { return numFramesIO_; }
     // number of valid frames per 8 BX packet
@@ -96,6 +132,8 @@ namespace trackerDTC {
     double invPtToDphi() const { return invPtToDphi_; }
     // region size in rad
     double baseRegion() const { return baseRegion_; }
+    // pt cut
+    double tpMinPt() const { return tpMinPt_; }
     // TP eta cut
     double tpMaxEta() const { return tpMaxEta_; }
     // TP cut on vertex pos r in cm
@@ -108,6 +146,8 @@ namespace trackerDTC {
     int tpMinLayers() const { return tpMinLayers_; }
     // required number of associated ps layers to a TP to consider it reconstruct-able
     int tpMinLayersPS() const { return tpMinLayersPS_; }
+    // BField used in fw in T
+    double bField() const { return bField_; }
 
     // TMTT specific parameter
 
@@ -126,7 +166,7 @@ namespace trackerDTC {
     // number of bits used for stub z
     int widthZ() const { return widthZ_; }
     // number of bits used for stub layer id
-    int widthLayer() const { return widthLayer_; }
+    int widthLayerId() const { return widthLayerId_; }
     // internal stub r precision in cm
     double baseR() const { return baseR_; }
     // internal stub z precision in cm
@@ -135,6 +175,20 @@ namespace trackerDTC {
     double basePhi() const { return basePhi_; }
     // number of padded 0s in output data format
     int dtcNumUnusedBits() const { return dtcNumUnusedBits_; }
+    // outer radius of outer tracker in cm
+    double outerRadius() const { return outerRadius_; }
+    // inner radius of outer tracker in cm
+    double innerRadius() const { return innerRadius_; }
+    // range of stub z residual w.r.t. sector center which needs to be covered
+    double neededRangeChiZ() const { return neededRangeChiZ_; }
+    // half length of outer tracker in cm
+    double halfLength() const { return halfLength_; }
+    // max strip/pixel length of outer tracker sensors in cm
+    double maxLength() const { return maxLength_; }
+    // In tilted barrel, grad*|z|/r+int approximates |cos(theta) - tiltAngle|/sin(theta)|
+    double tiltApproxSlope() const { return tiltApproxSlope_; }
+    // In tilted barrel, grad*|z|/r+int approximates |cos(theta) - tiltAngle|/sin(theta)|
+    double tiltApproxIntercept() const { return tiltApproxIntercept_; }
 
     // Hybrid specific parameter
 
@@ -157,7 +211,7 @@ namespace trackerDTC {
     // number of bits used for stub bend number for module types (barrelPS, barrel2S, diskPS, disk2S)
     int hybridWidthBend(SensorModule::Type type) const { return hybridWidthsBend_.at(type); }
     // number of bits used for stub layer id
-    int hybridWidthLayer() const { return hybridWidthLayer_; }
+    int hybridWidthLayerId() const { return hybridWidthLayerId_; }
     // precision or r in cm for (barrelPS, barrel2S, diskPS, disk2S)
     double hybridBaseR(SensorModule::Type type) const { return hybridBasesR_.at(type); }
     // precision or phi in rad for (barrelPS, barrel2S, diskPS, disk2S)
@@ -176,6 +230,8 @@ namespace trackerDTC {
     double hybridLayerR(int layerId) const { return hybridLayerRs_.at(layerId); }
     // mean z of outer tracker endcap disks
     double hybridDiskZ(int layerId) const { return hybridDiskZs_.at(layerId); }
+    // range of stub phi in rad
+    double hybridRangePhi() const { return hybridRangePhi_; }
 
     // Parameter specifying TTStub algorithm
 
@@ -261,10 +317,12 @@ namespace trackerDTC {
     const std::vector<SensorModule*>& dtcModules(int dtcId) const { return dtcModules_.at(dtcId); }
     // index = encoded layerId, inner value = decoded layerId for given tfp channel [0-47]
     const std::vector<int>& encodingLayerId(int tfpChannel) const;
+    // total number of output channel
+    int dtcNumStreams() const { return dtcNumStreams_; }
 
     // Parameter specifying GeometricProcessor
 
-    // number of phi sectors used in hough transform
+    // number of phi sectors in a processing nonant used in hough transform
     int numSectorsPhi() const { return numSectorsPhi_; }
     // number of eta sectors used in hough transform
     int numSectorsEta() const { return numSectorsEta_; }
@@ -284,6 +342,14 @@ namespace trackerDTC {
     int widthSectorEta() const { return widthSectorEta_; }
     // number of bits to represent z residual w.r.t. sector center
     int widthChiZ() const { return widthChiZ_; }
+    // total number of sectors
+    int numSectors() const { return numSectors_; }
+    // number of unused bits in GP output format
+    int gpNumUnusedBits() const { return gpNumUnusedBits_; }
+    // cot(theta) of given eta sector
+    double sectorCot(int eta) const { return sectorCots_.at(eta); }
+    // total number of gp output channel
+    int gpNumStreams() const { return gpNumStreams_; }
 
     // Parameter specifying HoughTransform
 
@@ -305,6 +371,12 @@ namespace trackerDTC {
     double htBaseQoverPt() const { return htBaseQoverPt_; }
     // phiT bin width in rad
     double htBasePhiT() const { return htBasePhiT_; }
+    // number of unused bits in HT output format
+    int htNumUnusedBits() const { return htNumUnusedBits_; }
+    // number of bits used for internal stub sector
+    int widthSector() const { return widthSector_; }
+    // total number of ht output channel
+    int htNumStreams() const { return htNumStreams_; }
 
     // Parameter specifying MiniHoughTransform
 
@@ -313,7 +385,11 @@ namespace trackerDTC {
     // number of finer phiT bins inside HT bin
     int mhtNumBinsPhiT() const { return mhtNumBinsPhiT_; }
     // number of dynamic load balancing steps
-    int mhtNumDLB() const { return mhtNumDLB_; }
+    int mhtNumDLBs() const { return mhtNumDLBs_; }
+    // number of units per dynamic load balancing step
+    int mhtNumDLBNodes() const { return mhtNumDLBNodes_; }
+    // number of inputs per dynamic load balancing unit
+    int mhtNumDLBChannel() const { return mhtNumDLBChannel_; }
     // required number of stub layers to form a candidate
     int mhtMinLayers() const { return mhtMinLayers_; }
     // number of mht cells
@@ -329,15 +405,17 @@ namespace trackerDTC {
 
     // Parameter specifying SeedFilter
 
+    // used z0 and zT bin width = baseZ * 2 ** this
+    int sfBaseDiff() const { return sfBaseDiff_; }
     // required number of stub layers to form a candidate
     int sfMinLayers() const { return sfMinLayers_; }
-    // cot(theta) precision
-    double sfBaseCot() const { return sfBaseCot_; }
-    // zT precision in cm
-    double sfBaseZT() const { return sfBaseZT_; }
+    // max number of output tracks per node
+    int sfMaxTracks() const { return sfMaxTracks_; }
 
     // Parameter specifying KalmanFilter
 
+    // number of kf worker
+    int kfNumWorker() const { return kfNumWorker_; }
     // number of bits for internal reciprocal look up
     int kfWidthLutInvPhi() const { return kfWidthLutInvPhi_; }
     // number of bits for internal reciprocal look up
@@ -405,6 +483,19 @@ namespace trackerDTC {
     double drBaseCot() const { return drBaseCot_; }
     double drBaseZ0() const { return drBaseZ0_; }
 
+    // LR
+
+    int lrBaseDiffPhiT() const { return lrBaseDiffPhiT_; }
+    int lrBaseDiffQoverPt() const { return lrBaseDiffQoverPt_; }
+    int lrBaseDiffZT() const { return lrBaseDiffZT_; }
+    int lrBaseDiffCot() const { return lrBaseDiffCot_; }
+    int lrNumIterations() const { return lrNumIterations_; }
+    int lrMinLayers() const { return lrMinLayers_; }
+    int lrMinLayersPS() const { return lrMinLayersPS_; }
+    double lrResidPhi() const { return lrResidPhi_; }
+    double lrResidZ2S() const { return lrResidZ2S_; }
+    double lrResidZPS() const { return lrResidZPS_; }
+
   private:
     // checks consitency between history and current configuration for a specific module
     void checkHistory(const edm::ProcessHistory&,
@@ -433,6 +524,8 @@ namespace trackerDTC {
     void checkTKLayoutId(int tkLayoutId) const;
     // range check of tfp identifier
     void checkTFPIdentifier(int tfpRegion, int tfpChannel) const;
+    // configure TPSelector
+    void configureTPSelector();
 
     // MagneticField
     const MagneticField* magneticField_;
@@ -535,9 +628,13 @@ namespace trackerDTC {
     std::vector<double> hybridDiskZs_;
     // center radius of outer tracker endcap 2S diks strips
     std::vector<edm::ParameterSet> hybridDisk2SRsSet_;
+    // range of stub phi in rad
+    double hybridRangePhi_;
 
     // Parameter specifying TrackingParticle used for Efficiency measurements
     edm::ParameterSet pSetTP_;
+    // pt cut
+    double tpMinPt_;
     // eta cut
     double tpMaxEta_;
     // cut on vertex pos r in cm
@@ -577,6 +674,12 @@ namespace trackerDTC {
     double halfLength_;
     // max strip/pixel pitch of outer tracker sensors in cm
     double maxPitch_;
+    // max strip/pixel length of outer tracker sensors in cm
+    double maxLength_;
+    //
+    double tiltApproxSlope_;
+    //
+    double tiltApproxIntercept_;
 
     // Parameter specifying front-end
     edm::ParameterSet pSetFE_;
@@ -625,6 +728,12 @@ namespace trackerDTC {
     int offsetLayerDisks_;
     // offset between 0 and smallest layer id (barrel layer 1)
     int offsetLayerId_;
+    // total number of output channel
+    int dtcNumStreams_;
+    // slot number changing from PS to 2S (default: 6)
+    int slotLimitPS_;
+    // slot number changing from 10 gbps to 5gbps (default: 3)
+    int slotLimit10gbps_;
 
     // Parameter specifying GeometricProcessor
     edm::ParameterSet pSetGP_;
@@ -640,6 +749,8 @@ namespace trackerDTC {
     int gpDepthMemory_;
     // defining r-z sector shape
     std::vector<double> boundariesEta_;
+    // total number of gp output channel
+    int gpNumStreams_;
 
     // Parameter specifying HoughTransform
     edm::ParameterSet pSetHT_;
@@ -651,6 +762,8 @@ namespace trackerDTC {
     int htMinLayers_;
     // internal fifo depth
     int htDepthMemory_;
+    // total number of ht output channel
+    int htNumStreams_;
 
     // Parameter specifying MiniHoughTransform
     edm::ParameterSet pSetMHT_;
@@ -659,21 +772,27 @@ namespace trackerDTC {
     // number of finer phiT bins inside HT bin
     int mhtNumBinsPhiT_;
     // number of dynamic load balancing steps
-    int mhtNumDLB_;
+    int mhtNumDLBs_;
+    // number of units per dynamic load balancing step
+    int mhtNumDLBNodes_;
+    // number of inputs per dynamic load balancing unit
+    int mhtNumDLBChannel_;
     // required number of stub layers to form a candidate
     int mhtMinLayers_;
 
     // Parameter specifying SeedFilter
     edm::ParameterSet pSetSF_;
-    // used cot(Theta) bin width = 2 ** this
-    int sfPowerBaseCot_;
-    // used zT bin width = baseZ * 2 ** this
-    int sfBaseDiffZ_;
+    // used z0 and zT bin width = baseZ * 2 ** this
+    int sfBaseDiff_;
     // required number of stub layers to form a candidate
     int sfMinLayers_;
+    // max number of output tracks per node
+    int sfMaxTracks_;
 
     // Parameter specifying KalmanFilter
     edm::ParameterSet pSetKF_;
+    // number of kf worker
+    int kfNumWorker_;
     // number of bits for internal reciprocal look up
     int kfWidthLutInvPhi_;
     // number of bits for internal reciprocal look up
@@ -688,6 +807,8 @@ namespace trackerDTC {
     int kfMaxStubsPerLayer_;
     // maximum allowed skipped layers from inside to outside to form a track
     int kfMaxSkippedLayers_;
+    //
+    int kfWidthLayerCount_;
     int kfBaseShiftr0_;
     int kfBaseShiftr02_;
     int kfBaseShiftv0_;
@@ -729,12 +850,30 @@ namespace trackerDTC {
     // number of bist used for z0
     int drWidthZ0_;
 
+    // LR
+
+    edm::ParameterSet pSetLR_;
+    int lrBaseDiffPhiT_;
+    int lrBaseDiffQoverPt_;
+    int lrBaseDiffZT_;
+    int lrBaseDiffCot_;
+    int lrNumIterations_;
+    int lrMinLayers_;
+    int lrMinLayersPS_;
+    double lrResidPhi_;
+    double lrResidZ2S_;
+    double lrResidZPS_;
+
     //
     // Derived constants
     //
 
     // true if tracker geometry and magnetic field supported
     bool configurationSupported_;
+    // selector to partly select TPs for efficiency measurements
+    TrackingParticleSelector tpSelector_;
+    // 
+    TrackingParticleSelector tpSelectorLoose_;
 
     // TTStubAlgorithm
 
@@ -765,7 +904,7 @@ namespace trackerDTC {
     // TMTT
 
     // number of bits used for stub layer id
-    int widthLayer_;
+    int widthLayerId_;
     // internal stub r precision in cm
     double baseR_;
     // internal stub z precision in cm
@@ -778,7 +917,7 @@ namespace trackerDTC {
     // hybrid
 
     // number of bits used for stub layer id
-    int hybridWidthLayer_;
+    int hybridWidthLayerId_;
     // precision or r in cm for (barrelPS, barrel2S, diskPS, disk2S)
     std::vector<double> hybridBasesR_;
     // precision or phi in rad for (barrelPS, barrel2S, diskPS, disk2S)
@@ -845,6 +984,12 @@ namespace trackerDTC {
     int widthSectorEta_;
     // number of bits to represent z residual w.r.t. sector center
     int widthChiZ_;
+    // total number of sectors
+    int numSectors_;
+    // number of unused bits in GP output format
+    int gpNumUnusedBits_;
+    // cot(theta) of eta sectors
+    std::vector<double> sectorCots_;
 
     // HT
 
@@ -858,6 +1003,10 @@ namespace trackerDTC {
     double htBaseQoverPt_;
     // phiT bin width precision in rad
     double htBasePhiT_;
+    // number of unused bits in HT output format
+    int htNumUnusedBits_;
+    // number of bits used for internal stub sector
+    int widthSector_;
 
     // MHT
 
@@ -873,11 +1022,6 @@ namespace trackerDTC {
     double mhtBasePhiT_;
 
     // SF
-
-    // cot(theta) precision
-    double sfBaseCot_;
-    // zT precision in cm
-    double sfBaseZT_;
 
     // KF
 

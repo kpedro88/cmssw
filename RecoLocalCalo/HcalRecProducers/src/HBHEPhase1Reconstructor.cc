@@ -21,9 +21,7 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
-#include <unordered_map>
-#include <utility>
-#include <tuple>
+#include <map>
 
 // user include files
 #include "FWCore/Framework/interface/ConsumesCollector.h"
@@ -325,7 +323,7 @@ private:
   std::unique_ptr<AbsHcalAlgoData> recoConfig_;
   edm::EDPutTokenT<HBHEChannelInfoCollection> tok_info_;
   edm::EDPutTokenT<HBHERecHitCollection> tok_rechit_;
-  std::unordered_map<int,HcalSiPMnonlinearity> sipmNonlinMap_;
+  std::map<int,HcalSiPMnonlinearity> sipmNonlinMap_;
 
   // Status bit setters
   const HBHENegativeEFilter* negEFilter_;  // We don't manage this pointer

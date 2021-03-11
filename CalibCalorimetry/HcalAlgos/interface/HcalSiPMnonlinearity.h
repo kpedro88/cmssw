@@ -6,6 +6,8 @@
 
 class HcalSiPMnonlinearity {
 public:
+  HcalSiPMnonlinearity() : a2(0), b1(0), c0(0) {}
+
   HcalSiPMnonlinearity(const std::vector<float>& pars) {
     assert(pars.size() == 3);
     c0 = (double)pars[0];

@@ -21,6 +21,9 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <unordered_map>
+#include <utility>
+#include <tuple>
 
 // user include files
 #include "FWCore/Framework/interface/ConsumesCollector.h"
@@ -82,7 +85,8 @@ namespace {
                                const CaloSamples& cs,
                                const int soi,
                                const DFrame& frame,
-                               const int maxTS) {}
+                               const int maxTS,
+                               const HcalSiPMnonlinearity* corr) {}
 
     inline double getRawCharge(const double decodedCharge, const double pedestal) const { return decodedCharge; }
   };
@@ -97,10 +101,9 @@ namespace {
                                const CaloSamples& cs,
                                const int soi,
                                const QIE11DataFrame& frame,
-                               const int maxTS)
-        : siPMParameter_(*properties.siPMParameter),
-          fcByPE_(siPMParameter_.getFCByPE()),
-          corr_(cond.getHcalSiPMCharacteristics()->getNonLinearities(siPMParameter_.getType())) {
+                               const int maxTS,
+                               const HcalSiPMnonlinearity* corr)
+        : fcByPE_(properties.siPMParameter->getFCByPE()) {
       if (fcByPE_ <= 0.0)
         throw cms::Exception("HBHEPhase1BadDB") << "Invalid fC/PE conversion factor" << std::endl;
 
@@ -114,7 +117,7 @@ namespace {
       }
 
       const double effectivePixelsFired = sipmQ / fcByPE_;
-      factor_ = corr_.getRecoCorrectionFactor(effectivePixelsFired);
+      factor_ = corr->getRecoCorrectionFactor(effectivePixelsFired);
     }
 
     inline double getRawCharge(const double decodedCharge, const double pedestal) const {
@@ -127,9 +130,7 @@ namespace {
     }
 
   private:
-    const HcalSiPMParameter& siPMParameter_;
     double fcByPE_;
-    HcalSiPMnonlinearity corr_;
     double factor_;
   };
 
@@ -324,6 +325,7 @@ private:
   std::unique_ptr<AbsHcalAlgoData> recoConfig_;
   edm::EDPutTokenT<HBHEChannelInfoCollection> tok_info_;
   edm::EDPutTokenT<HBHERecHitCollection> tok_rechit_;
+  std::unordered_map<int,HcalSiPMnonlinearity> sipmNonlinMap_;
 
   // Status bit setters
   const HBHENegativeEFilter* negEFilter_;  // We don't manage this pointer
@@ -510,7 +512,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     const int nRead = cs.size();
     const int maxTS = std::min(nRead, static_cast<int>(HBHEChannelInfo::MAXSAMPLES));
     const int soi = tsFromDB_ ? properties.paramTs->firstSample() : frame.presamples();
-    const RawChargeFromSample<DFrame> rcfs(sipmQTSShift_, sipmQNTStoSum_, cond, properties, cs, soi, frame, maxTS);
+    const RawChargeFromSample<DFrame> rcfs(sipmQTSShift_, sipmQNTStoSum_, cond, properties, cs, soi, frame, maxTS, &sipmNonlinMap_[properties.siPMParameter->getType()]);
     int soiCapid = 4;
 
     // Typical expected cases:
@@ -660,6 +662,14 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
   // Fetch the calibrations
   const HcalDbService* conditions = &eventSetup.getData(conditionsToken_);
   const HcalChannelPropertiesVec* prop = &eventSetup.getData(propertiesToken_);
+
+  // cache the SiPM nonlinearity (avoid copying and reconstructing)
+  sipmNonlinMap_.clear();
+  for(unsigned i = 0; i < conditions->getHcalSiPMCharacteristics()->getTypes(); ++i){
+    auto sipmType = conditions->getHcalSiPMCharacteristics()->getType(i);
+//    sipmNonlinMap_[sipmType] = HcalSiPMnonlinearity(conditions->getHcalSiPMCharacteristics()->getNonLinearities(sipmType));
+    sipmNonlinMap_.emplace(sipmType, conditions->getHcalSiPMCharacteristics()->getNonLinearities(sipmType));
+  }
 
   // Configure the negative energy filter
   if (setNegativeFlagsQIE8_ || setNegativeFlagsQIE11_) {

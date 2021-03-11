@@ -322,6 +322,8 @@ private:
   edm::EDGetTokenT<QIE11DigiCollection> tok_qie11_;
   std::unique_ptr<AbsHBHEPhase1Algo> reco_;
   std::unique_ptr<AbsHcalAlgoData> recoConfig_;
+  edm::EDPutTokenT<HBHEChannelInfoCollection> tok_info_;
+  edm::EDPutTokenT<HBHERecHitCollection> tok_rechit_;
 
   // Status bit setters
   const HBHENegativeEFilter* negEFilter_;  // We don't manage this pointer
@@ -421,10 +423,10 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
     tok_qie11_ = consumes<QIE11DigiCollection>(conf.getParameter<edm::InputTag>("digiLabelQIE11"));
 
   if (saveInfos_)
-    produces<HBHEChannelInfoCollection>();
+    tok_info_ = produces<HBHEChannelInfoCollection>();
 
   if (makeRecHits_)
-    produces<HBHERecHitCollection>();
+    tok_rechit_ = produces<HBHERecHitCollection>();
 
   // ES tokens
   htopoToken_ = esConsumes<HcalTopology, HcalRecNumberingRecord>();
@@ -715,9 +717,9 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
 
   // Add the output collections to the event record
   if (saveInfos_)
-    e.put(std::move(infos));
+    e.put(tok_info_, std::move(infos));
   if (makeRecHits_)
-    e.put(std::move(out));
+    e.put(tok_rechit_, std::move(out));
 }
 
 // ------------ method called when starting to processes a run  ------------

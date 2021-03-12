@@ -307,6 +307,7 @@ private:
   bool use8ts_;
   int sipmQTSShift_;
   int sipmQNTStoSum_;
+  bool disableDifferentialChargeGain_;
 
   // Parameters for turning status bit setters on/off
   bool setNegativeFlagsQIE8_;
@@ -386,6 +387,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       use8ts_(conf.getParameter<bool>("use8ts")),
       sipmQTSShift_(conf.getParameter<int>("sipmQTSShift")),
       sipmQNTStoSum_(conf.getParameter<int>("sipmQNTStoSum")),
+      disableDifferentialChargeGain_(conf.getParameter<bool>("disableDifferentialChargeGain")),
       setNegativeFlagsQIE8_(conf.getParameter<bool>("setNegativeFlagsQIE8")),
       setNegativeFlagsQIE11_(conf.getParameter<bool>("setNegativeFlagsQIE11")),
       setNoiseFlagsQIE8_(conf.getParameter<bool>("setNoiseFlagsQIE8")),
@@ -548,7 +550,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
       // Always use QIE-only pedestal for this computation
       const double rawCharge = rcfs.getRawCharge(cs[inputTS], pAndGain.pedestal(false));
       const float t = getTDCTimeFromSample(s);
-      const float dfc = getDifferentialChargeGain(
+      const float dfc = disableDifferentialChargeGain_ ? 0.f : getDifferentialChargeGain(
           *properties.channelCoder, *properties.shape, adc, capid, channelInfo->hasTimeInfo());
       channelInfo->setSample(copyTS,
                              adc,
@@ -792,6 +794,7 @@ void HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& d
   desc.add<bool>("setPulseShapeFlagsQIE11");
   desc.add<bool>("setLegacyFlagsQIE8");
   desc.add<bool>("setLegacyFlagsQIE11");
+  desc.add<bool>("disableDifferentialChargeGain", false);
 
   desc.add<edm::ParameterSetDescription>("algorithm", fillDescriptionForParseHBHEPhase1Algo());
   add_param_set(flagParametersQIE8);

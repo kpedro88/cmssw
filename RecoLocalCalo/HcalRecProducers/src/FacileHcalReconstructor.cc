@@ -12,12 +12,14 @@
 #include "Geometry/CaloTopology/interface/HcalTopology.h"
 #include "Geometry/Records/interface/HcalRecNumberingRecord.h"
 
+#include <vector>
+
 class FacileHcalReconstructor : public SonicEDProducer<TritonClient> {
 public:
   explicit FacileHcalReconstructor(edm::ParameterSet const& cfg)
       : SonicEDProducer<TritonClient>(cfg),
         fChannelInfoName_(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
-        fTokChannelInfo_(consumes<HBHEChannelInfoCollection>(fChannelInfoName_)),
+        fTokChannelInfo_(consumes<std::vector<HBHEChannelInfo>>(fChannelInfoName_)),
         htopoToken_(esConsumes<HcalTopology, HcalRecNumberingRecord>()) {
     produces<HBHERecHitCollection>();
     setDebugName("FacileHcalReconstructor");
@@ -94,7 +96,7 @@ public:
 
 private:
   edm::InputTag fChannelInfoName_;
-  edm::EDGetTokenT<HBHEChannelInfoCollection> fTokChannelInfo_;
+  edm::EDGetTokenT<std::vector<HBHEChannelInfo>> fTokChannelInfo_;
   std::vector<HcalDetId> hcalIds_;
   edm::ESGetToken<HcalTopology, HcalRecNumberingRecord> htopoToken_;
 };

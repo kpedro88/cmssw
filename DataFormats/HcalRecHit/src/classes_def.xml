@@ -85,6 +85,7 @@
    <class name="edm::Wrapper<edm::SortedCollection<CastorRecHit,edm::StrictWeakOrdering<CastorRecHit> > >" />
    <class name="edm::Wrapper<edm::SortedCollection<HcalCalibRecHit,edm::StrictWeakOrdering<HcalCalibRecHit> > >" splitLevel="0"/>
    <class name="edm::Wrapper<edm::SortedCollection<HBHEChannelInfo,edm::StrictWeakOrdering<HBHEChannelInfo> > >" />
+   <class name="edm::Wrapper<std::vector<HBHEChannelInfo> >"/>
 
    <class name="edm::Wrapper<HcalSourcePositionData>"/>
 

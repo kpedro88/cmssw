@@ -298,6 +298,7 @@ private:
   bool processQIE8_;
   bool processQIE11_;
   bool saveInfos_;
+  bool saveInfosVector_;
   bool saveDroppedInfos_;
   bool makeRecHits_;
   bool dropZSmarkedPassed_;
@@ -323,6 +324,7 @@ private:
   std::unique_ptr<AbsHBHEPhase1Algo> reco_;
   std::unique_ptr<AbsHcalAlgoData> recoConfig_;
   edm::EDPutTokenT<HBHEChannelInfoCollection> tok_info_;
+  edm::EDPutTokenT<std::vector<HBHEChannelInfo>> tok_vinfo_;
   edm::EDPutTokenT<HBHERecHitCollection> tok_rechit_;
   std::map<int,HcalSiPMnonlinearity> sipmNonlinMap_;
 
@@ -342,14 +344,14 @@ private:
 
   // For the function below, arguments "infoColl" and/or "rechits"
   // are allowed to be null.
-  template <class DataFrame, class Collection>
+  template <class DataFrame, class Collection, class InfoCollection>
   void processData(const Collection& coll,
                    const HcalTopology& htopo,
                    const HcalDbService& cond,
                    const HcalChannelPropertiesVec& prop,
                    const bool isRealData,
                    HBHEChannelInfo* info,
-                   HBHEChannelInfoCollection* infoColl,
+                   InfoCollection* infoColl,
                    HBHERecHitCollection* rechits);
 
   // Methods for setting rechit status bits
@@ -378,6 +380,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       processQIE8_(conf.getParameter<bool>("processQIE8")),
       processQIE11_(conf.getParameter<bool>("processQIE11")),
       saveInfos_(conf.getParameter<bool>("saveInfos")),
+      saveInfosVector_(conf.getParameter<bool>("saveInfosVector")),
       saveDroppedInfos_(conf.getParameter<bool>("saveDroppedInfos")),
       makeRecHits_(conf.getParameter<bool>("makeRecHits")),
       dropZSmarkedPassed_(conf.getParameter<bool>("dropZSmarkedPassed")),
@@ -424,8 +427,12 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
   if (processQIE11_)
     tok_qie11_ = consumes<QIE11DigiCollection>(conf.getParameter<edm::InputTag>("digiLabelQIE11"));
 
-  if (saveInfos_)
-    tok_info_ = produces<HBHEChannelInfoCollection>();
+  if (saveInfos_){
+    if (saveInfosVector_)
+      tok_vinfo_ = produces<std::vector<HBHEChannelInfo>>();
+    else
+      tok_info_ = produces<HBHEChannelInfoCollection>();
+  }
 
   if (makeRecHits_)
     tok_rechit_ = produces<HBHERecHitCollection>();
@@ -448,14 +455,14 @@ HBHEPhase1Reconstructor::~HBHEPhase1Reconstructor() {
 //
 // member functions
 //
-template <class DFrame, class Collection>
+template <class DFrame, class Collection, class InfoCollection>
 void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           const HcalTopology& htopo,
                                           const HcalDbService& cond,
                                           const HcalChannelPropertiesVec& prop,
                                           const bool isRealData,
                                           HBHEChannelInfo* channelInfo,
-                                          HBHEChannelInfoCollection* infos,
+                                          InfoCollection* infos,
                                           HBHERecHitCollection* rechits) {
   // If "saveDroppedInfos_" flag is set, fill the info with something
   // meaningful even if the database tells us to drop this channel.
@@ -692,9 +699,16 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
 
   // Create new output collections
   std::unique_ptr<HBHEChannelInfoCollection> infos;
+  std::unique_ptr<std::vector<HBHEChannelInfo>> vinfos;
   if (saveInfos_) {
-    infos = std::make_unique<HBHEChannelInfoCollection>();
-    infos->reserve(maxOutputSize);
+    if (saveInfosVector_) {
+      vinfos = std::make_unique<std::vector<HBHEChannelInfo>>();
+      vinfos->reserve(maxOutputSize);
+    }
+    else {
+      infos = std::make_unique<HBHEChannelInfoCollection>();
+      infos->reserve(maxOutputSize);
+    }
   }
 
   std::unique_ptr<HBHERecHitCollection> out;
@@ -710,7 +724,10 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
       hbheFlagSetterQIE8_->Clear();
 
     HBHEChannelInfo channelInfo(false, false);
-    processData<HBHEDataFrame>(*hbDigis, *htopo, *conditions, *prop, isData, &channelInfo, infos.get(), out.get());
+    if(saveInfosVector_)
+      processData<HBHEDataFrame>(*hbDigis, *htopo, *conditions, *prop, isData, &channelInfo, vinfos.get(), out.get());
+    else
+      processData<HBHEDataFrame>(*hbDigis, *htopo, *conditions, *prop, isData, &channelInfo, infos.get(), out.get());
     if (setNoiseFlagsQIE8_)
       hbheFlagSetterQIE8_->SetFlagsFromRecHits(*out);
   }
@@ -720,14 +737,21 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
       hbheFlagSetterQIE11_->Clear();
 
     HBHEChannelInfo channelInfo(true, saveEffectivePedestal_);
-    processData<QIE11DataFrame>(*heDigis, *htopo, *conditions, *prop, isData, &channelInfo, infos.get(), out.get());
+    if(saveInfosVector_)
+      processData<QIE11DataFrame>(*heDigis, *htopo, *conditions, *prop, isData, &channelInfo, vinfos.get(), out.get());
+    else
+      processData<QIE11DataFrame>(*heDigis, *htopo, *conditions, *prop, isData, &channelInfo, infos.get(), out.get());
     if (setNoiseFlagsQIE11_)
       hbheFlagSetterQIE11_->SetFlagsFromRecHits(*out);
   }
 
   // Add the output collections to the event record
-  if (saveInfos_)
-    e.put(tok_info_, std::move(infos));
+  if (saveInfos_){
+    if(saveInfosVector_)
+      e.put(tok_vinfo_, std::move(vinfos));
+    else
+      e.put(tok_info_, std::move(infos));
+  }
   if (makeRecHits_)
     e.put(tok_rechit_, std::move(out));
 }
@@ -777,6 +801,7 @@ void HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& d
   desc.add<bool>("processQIE8");
   desc.add<bool>("processQIE11");
   desc.add<bool>("saveInfos");
+  desc.add<bool>("saveInfosVector", false);
   desc.add<bool>("saveDroppedInfos");
   desc.add<bool>("makeRecHits");
   desc.add<bool>("dropZSmarkedPassed");

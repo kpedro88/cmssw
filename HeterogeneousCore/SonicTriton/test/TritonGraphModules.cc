@@ -170,23 +170,11 @@ private:
 
 DEFINE_FWK_MODULE(TritonGraphAnalyzer);
 
-//this example is intended only for private testing, not for production use
-//in production, the dedicated Triton modules should be used, in order to take advantage of ExternalWork (minimize impact of latency)
-//and also to minimize duplication of common interfaces and operations
-class TritonGraphStandaloneProducer : public edm::stream::EDProducer<> {
-public:
-  TritonGraphStandaloneProducer(edm::ParameterSet const& cfg)
-      : clientPset_(cfg.getParameterSet("Client")), debugName_("TritonGraphStandaloneProducer"), helper_(cfg) {
-    //not using ExternalWork, so Sync mode is enforced
-    if (clientPset_.getParameter<std::string>("mode") != "Sync") {
-      clientPset_.addParameter<std::string>("mode", "Sync");
-    }
-    edm::Service<TritonService> ts;
-    ts->addModel(clientPset_.getParameter<std::string>("modelName"),
-                 clientPset_.getParameter<edm::FileInPath>("modelConfigPath").fullPath());
-  }
+#include "HeterogeneousCore/SonicTriton/interface/TritonStandaloneProducer.h"
 
-  void beginStream(edm::StreamID) override { makeClient(); }
+class TritonGraphStandaloneProducer : public TritonStandaloneProducer<> {
+public:
+  TritonGraphStandaloneProducer(edm::ParameterSet const& cfg) : TritonStandaloneProducer(cfg, "TritonGraphStandaloneProducer"), helper_(cfg) {}
 
   void produce(edm::Event& iEvent, edm::EventSetup const& iSetup) final {
     //set up input
@@ -208,14 +196,8 @@ public:
   }
 
 protected:
-  //helper
-  void makeClient() { client_ = std::make_unique<TritonClient>(clientPset_, debugName_); }
-
   //members
-  edm::ParameterSet clientPset_;
-  std::unique_ptr<TritonClient> client_;
-  std::string debugName_;
-  TritonGraphHelper helper_;
+  TritonGraphHelper helper_;  
 };
 
 DEFINE_FWK_MODULE(TritonGraphStandaloneProducer);

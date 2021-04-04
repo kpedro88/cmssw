@@ -65,6 +65,7 @@ models = {
     "TritonGraphProducer": "gat_test",
     "TritonGraphFilter": "gat_test",
     "TritonGraphAnalyzer": "gat_test",
+    "TritonGraphStandaloneProducer": "gat_test",
 }
 
 modules = {

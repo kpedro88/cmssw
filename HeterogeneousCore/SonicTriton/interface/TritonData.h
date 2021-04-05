@@ -24,6 +24,10 @@ using TritonInput = std::vector<std::vector<DT>>;
 template <typename DT>
 using TritonOutput = std::vector<edm::Span<const DT*>>;
 
+//other useful typdefs
+template <typename DT>
+using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
+
 //store all the info needed for triton input and output
 template <typename IO>
 class TritonData {
@@ -42,7 +46,9 @@ public:
 
   //io accessors
   template <typename DT>
-  void toServer(std::shared_ptr<TritonInput<DT>> ptr);
+  TritonInputContainer<DT> allocate(bool reserve=true);
+  template <typename DT>
+  void toServer(TritonInputContainer<DT> ptr);
   template <typename DT>
   TritonOutput<DT> fromServer() const;
 
@@ -101,6 +107,9 @@ using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferReques
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
+template <>
+template <typename DT>
+TritonInputContainer<DT> TritonInputData::allocate(bool reserve);
 template <>
 template <typename DT>
 void TritonInputData::toServer(std::shared_ptr<TritonInput<DT>> ptr);

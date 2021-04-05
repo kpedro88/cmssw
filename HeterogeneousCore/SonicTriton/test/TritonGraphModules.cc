@@ -32,15 +32,13 @@ public:
     //set shapes
     auto& input1 = iInput.at("x__0");
     input1.setShape(0, nnodes);
-    auto data1 = std::make_shared<TritonInput<float>>(1);
+    auto data1 = input1.allocate<float>();
     auto& vdata1 = (*data1)[0];
-    vdata1.reserve(input1.sizeShape());
 
     auto& input2 = iInput.at("edgeindex__1");
     input2.setShape(1, nedges);
-    auto data2 = std::make_shared<TritonInput<int64_t>>(1);
+    auto data2 = input2.allocate<int64_t>();
     auto& vdata2 = (*data2)[0];
-    vdata2.reserve(input2.sizeShape());
 
     //fill
     std::normal_distribution<float> randx(-10, 4);

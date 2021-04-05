@@ -101,10 +101,26 @@ void TritonData<IO>::setBatchSize(unsigned bsize) {
     fullShape_[0] = batchSize_;
 }
 
+template <>
+template <typename DT>
+TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
+  //automatically creates a vector for each batch entry
+  auto ptr = std::make_shared<TritonInput<DT>>(batchSize_);
+  if(reserve){
+    auto size = sizeShape();
+    if(size>0){
+      for(auto& vec: *ptr){
+        vec.reserve(size);
+      }
+    }
+  }
+  return ptr;
+}
+
 //io accessors
 template <>
 template <typename DT>
-void TritonInputData::toServer(std::shared_ptr<TritonInput<DT>> ptr) {
+void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   const auto& data_in = *ptr;
 
   //check batch size
@@ -179,7 +195,10 @@ void TritonOutputData::reset() {
 template class TritonData<nic::InferInput>;
 template class TritonData<nic::InferRequestedOutput>;
 
-template void TritonInputData::toServer(std::shared_ptr<TritonInput<float>> data_in);
-template void TritonInputData::toServer(std::shared_ptr<TritonInput<int64_t>> data_in);
+template TritonInputContainer<float> TritonInputData::allocate(bool reserve);
+template TritonInputContainer<int64_t> TritonInputData::allocate(bool reserve);
+
+template void TritonInputData::toServer(TritonInputContainer<float> data_in);
+template void TritonInputData::toServer(TritonInputContainer<int64_t> data_in);
 
 template TritonOutput<float> TritonOutputData::fromServer() const;

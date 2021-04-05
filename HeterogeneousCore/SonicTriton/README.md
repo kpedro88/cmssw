@@ -31,6 +31,10 @@ The model information from the server can be printed by enabling `verbose` outpu
 * `timeout`: maximum allowed time for a request
 * `outputs`: optional, specify which output(s) the server should send
 
+The batch size should be set using the client accessor, in order to ensure a consistent value across all inputs:
+* `setBatchSize()`: set a new batch size
+  * some models may not support batching
+
 Useful `TritonData` accessors include:
 * `variableDims()`: return true if any variable dimensions
 * `sizeDims()`: return product of dimensions (-1 if any variable dimensions)
@@ -39,8 +43,6 @@ Useful `TritonData` accessors include:
 * `byteSize()`: return number of bytes for data type
 * `dname()`: return name of data type
 * `batchSize()`: return current batch size
-* `setBatchSize()`: set a new batch size
-  * some models may not support batching
 
 To update the `TritonData` shape in the variable-dimension case:
 * `setShape(const std::vector<int64_t>& newShape)`: update all (variable) dimensions with values provided in `newShape`
@@ -49,8 +51,16 @@ To update the `TritonData` shape in the variable-dimension case:
 There are specific local input and output containers that should be used in producers.
 Here, `T` is a primitive type, and the two aliases listed below are passed to `TritonInputData::toServer()`
 and returned by `TritonOutputData::fromServer()`, respectively:
-* `TritonInput<T> = std::vector<std::vector<T>>`
+* `TritonInputContainer<T> = std::shared_ptr<TritonInput<T>> = std::shared_ptr<std::vector<std::vector<T>>>`
 * `TritonOutput<T> = std::vector<edm::Span<const T*>>`
+
+The `TritonInput` type expects one vector per batch entry (i.e. the size of the outer vector is the batch size).
+To simplify the creation of the `TritonInputContainer`, a helper function is available.
+This helper function will create one vector per batch entry.
+(Therefore, `TritonClient::setBatchSize()` should be called, if necessary, before calling the helper.)
+It will also reserve the expected size of the input in each inner vector (by default),
+if the concrete shape is available (i.e. `setShape()` was already called, if the input has variable dimensions).
+* `allocate<T>()`: return a `TritonInputContainer` properly allocated with respect to batch and input sizes
 
 ## Modules
 
@@ -71,7 +81,7 @@ If an `edm::GlobalCache` of type `T` is needed, there are two changes:
 In a SONIC Triton producer, the basic flow should follow this pattern:
 1. `acquire()`:  
     a. access input object(s) from `TritonInputMap`  
-    b. allocate input data using `std::make_shared<TritonInput<T>>()`  
+    b. allocate input data using `allocate<T>()`  
     c. fill input data  
     d. set input shape(s) (optional, only if any variable dimensions)  
     e. convert using `toServer()` function of input object(s)  

@@ -34,10 +34,9 @@ public:
     // create an npix x npix x ncol image w/ arbitrary color value
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
-    auto data1 = std::make_shared<TritonInput<float>>();
-    data1->reserve(batchSize_);
-    for (unsigned i = 0; i < batchSize_; ++i) {
-      data1->emplace_back(input1.sizeDims(), 0.5f);
+    auto data1 = input1.allocate<float>();
+    for (auto& vdata1: *data1){
+      vdata1.assign(input1.sizeDims(), 0.5f);
     }
     // convert to server format
     input1.toServer(data1);

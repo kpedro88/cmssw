@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <memory>
 #include <any>
+#include <atomic>
 
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
@@ -38,7 +39,7 @@ public:
   using ShapeView = edm::Span<ShapeType::const_iterator>;
 
   //constructor
-  TritonData(const std::string& name, const TensorMetadata& model_info, bool noBatch);
+  TritonData(const std::string& name, const TensorMetadata& model_info, TritonClient* client, const std::string& pid);
 
   //some members can be modified
   bool setShape(const ShapeType& newShape) { return setShape(newShape, true); }
@@ -83,10 +84,18 @@ private:
     return std::accumulate(vec.begin(), vec.end(), 1, std::multiplies<int64_t>());
   }
   void createObject(IO** ioptr) const;
+  //generates a unique id number for each instance of the class
+  unsigned uid() const {
+    static std::atomic<unsigned> uid{0};
+    return ++uid;
+  }
+  std::string xput() const;
 
   //members
   std::string name_;
   std::shared_ptr<IO> data_;
+  TritonClient* client_;
+  std::string shmName_;
   const ShapeType dims_;
   bool noBatch_;
   unsigned batchSize_;
@@ -97,7 +106,9 @@ private:
   std::string dname_;
   inference::DataType dtype_;
   int64_t byteSize_;
+  size_t totalByteSize_;
   std::any holder_;
+  void* holderShm_;
   std::shared_ptr<Result> result_;
 };
 
@@ -107,6 +118,10 @@ using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferReques
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
+template <>
+std::string TritonInputData::xput() const;
+template <>
+std::string TritonOutputData::xput() const;
 template <>
 template <typename DT>
 TritonInputContainer<DT> TritonInputData::allocate(bool reserve);

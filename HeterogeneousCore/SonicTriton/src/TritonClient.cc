@@ -29,13 +29,13 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
       options_(params.getParameter<std::string>("modelName")) {
   //get appropriate server for this model
   edm::Service<TritonService> ts;
-  const auto& [url, isFallbackCPU] =
+  const auto& [url, serverType_] =
       ts->serverAddress(options_.model_name_, params.getUntrackedParameter<std::string>("preferredServer"));
   if (verbose_)
     edm::LogInfo(fullDebugName_) << "Using server: " << url;
   //enforce sync mode for fallback CPU server to avoid contention
   //todo: could enforce async mode otherwise (unless mode was specified by user?)
-  if (isFallbackCPU)
+  if (serverType_==TritonServerType::LocalCPU)
     setMode(SonicMode::Sync);
 
   //connect to the server
@@ -96,7 +96,7 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput.name();
     auto [curr_itr, success] = input_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput, noBatch_));
+        std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput, this, ts->pid()));
     auto& curr_input = curr_itr->second;
     inputsTriton_.push_back(curr_input.data());
     if (verbose_) {
@@ -119,7 +119,7 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
     if (!s_outputs.empty() and s_outputs.find(oname) == s_outputs.end())
       continue;
     auto [curr_itr, success] = output_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput, noBatch_));
+        std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput, this, ts->pid()));
     auto& curr_output = curr_itr->second;
     outputsTriton_.push_back(curr_output.data());
     if (verbose_) {

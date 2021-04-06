@@ -1,4 +1,5 @@
 #include "HeterogeneousCore/SonicTriton/interface/TritonData.h"
+#include "HeterogeneousCore/SonicTriton/interface/TritonClient.h"
 #include "HeterogeneousCore/SonicTriton/interface/triton_utils.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
@@ -6,6 +7,9 @@
 
 #include <cstring>
 #include <sstream>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -18,14 +22,54 @@ namespace nvidia {
   }  // namespace inferenceserver
 }  // namespace nvidia
 
+//shared memory helper functions
+//simplified from https://github.com/triton-inference-server/server/blob/v2.3.0/src/clients/c++/examples/shm_utils.cc
+namespace {
+  void createSharedMemoryRegion(const std::string& shm_key, size_t byte_size, void** shm_addr) {
+    //get shared memory region descriptor
+    int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (shm_fd == -1)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to get shared memory descriptor for key: " << shm_key;
+
+    //extend shared memory object
+    int res = ftruncate(shm_fd, byte_size);
+    if (res == -1)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to initialize shared memory key " << shm_key << " to requested size: " << byte_size;
+
+    //map to process address space
+    constexpr size_t offset(0);
+    *shm_addr = mmap(NULL, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, offset);
+    if(*shm_addr == MAP_FAILED)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to map to process address space for shared memory key: " << shm_key;
+
+    //close descriptor
+    if(close(shm_fd) == -1)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to close descriptor for shared memory key: " << shm_key;
+  }
+  void destroySharedMemoryRegion(const std::string& shm_key, size_t byte_size, void* shm_addr) {
+    //unmap
+    int tmp_fd = munmap(shm_addr, byte_size);
+    if (tmp_fd == -1)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to munmap for shared memory key: " << shm_key;
+
+    //unlink
+    int shm_fd = shm_unlink(shm_key.c_str());
+    if (shm_fd == -1)
+      throw cms::Exception("TritonSharedMemoryError") << "unable to unlink for shared memory key: " << shm_key;
+  }
+}
+
 //dims: kept constant, represents config.pbtxt parameters of model (converted from google::protobuf::RepeatedField to vector)
 //fullShape: if batching is enabled, first entry is batch size; values can be modified
 //shape: view into fullShape, excluding batch size entry
 template <typename IO>
-TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::TensorMetadata& model_info, bool noBatch)
+TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::TensorMetadata& model_info, TritonClient* client, const std::string& pid)
     : name_(name),
+      client_(client),
+      //ensure unique name for shared memory region
+      shmName_(client_->serverType()!=TritonServerType::Remote ? pid+"_"+xput()+std::to_string(uid()) : ""),
       dims_(model_info.shape().begin(), model_info.shape().end()),
-      noBatch_(noBatch),
+      noBatch_(client_->noBatch()),
       batchSize_(0),
       fullShape_(dims_),
       shape_(fullShape_.begin() + (noBatch_ ? 0 : 1), fullShape_.end()),
@@ -33,7 +77,9 @@ TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::Tensor
       productDims_(variableDims_ ? -1 : dimProduct(shape_)),
       dname_(model_info.datatype()),
       dtype_(ni::ProtocolStringToDataType(dname_)),
-      byteSize_(ni::GetDataTypeByteSize(dtype_)) {
+      byteSize_(ni::GetDataTypeByteSize(dtype_)),
+      totalByteSize_(0),
+      holderShm_(nullptr) {
   //create input or output object
   IO* iotmp;
   createObject(&iotmp);
@@ -49,6 +95,12 @@ template <>
 void TritonOutputData::createObject(nic::InferRequestedOutput** ioptr) const {
   nic::InferRequestedOutput::Create(ioptr, name_);
 }
+
+template <>
+std::string TritonInputData::xput() const { return "input"; }
+
+template <>
+std::string TritonOutputData::xput() const { return "output"; }
 
 //setters
 template <typename IO>
@@ -125,7 +177,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 
   //check batch size
   if (data_in.size() != batchSize_) {
-    throw cms::Exception("TritonDataError") << name_ << " input(): input vector has size " << data_in.size()
+    throw cms::Exception("TritonDataError") << name_ << " toServer(): input vector has size " << data_in.size()
                                             << " but specified batch size is " << batchSize_;
   }
 
@@ -133,29 +185,53 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   data_->SetShape(fullShape_);
 
   if (byteSize_ != sizeof(DT))
-    throw cms::Exception("TritonDataError") << name_ << " input(): inconsistent byte size " << sizeof(DT)
+    throw cms::Exception("TritonDataError") << name_ << " toServer(): inconsistent byte size " << sizeof(DT)
                                             << " (should be " << byteSize_ << " for " << dname_ << ")";
 
   int64_t nInput = sizeShape();
-  for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
-    const DT* arr = data_in[i0].data();
-    triton_utils::throwIfError(data_->AppendRaw(reinterpret_cast<const uint8_t*>(arr), nInput * byteSize_),
-                               name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
+  //decide between shared memory or gRPC call
+  if (client_->serverType()==TritonServerType::LocalCPU) {
+    size_t byteSizePerBatch = byteSize_*nInput;
+    totalByteSize_ = byteSizePerBatch*batchSize_;
+    DT* ptrShm;
+    createSharedMemoryRegion(shmName_, totalByteSize_, (void**)&ptrShm);
+    //copy into shared memory region
+    for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
+      std::memcpy(ptrShm + i0*byteSizePerBatch, data_in[i0].data(), byteSizePerBatch);
+    }
+    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
+    triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " toServer(): unable to set shared memory");
+    //keep shm ptr
+    holderShm_ = ptrShm;
+    //possible future enhancement:
+    //modify allocate() so input is written directly into shared memory, w/o memcpy
+    //to do this at runtime would require a custom allocator that normally behaves as std::allocator,
+    //but behaves as allocator<T,managed_shared_memory::segment_manager> (using boost::interprocess) in the LocalCPU case
+    //todo: determine if this would work even if batch size and concrete shape not known before calling allocate(), and if it would actually be faster
   }
-
-  //keep input data in scope
-  holder_ = std::move(ptr);
+  else if (client_->serverType()==TritonServerType::LocalGPU) {
+    //todo
+  }
+  else {
+    for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
+      const DT* arr = data_in[i0].data();
+      triton_utils::throwIfError(data_->AppendRaw(reinterpret_cast<const uint8_t*>(arr), nInput * byteSize_),
+                                 name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
+    }
+    //keep input data in scope
+    holder_ = std::move(ptr);
+  }
 }
 
 template <>
 template <typename DT>
 TritonOutput<DT> TritonOutputData::fromServer() const {
   if (!result_) {
-    throw cms::Exception("TritonDataError") << name_ << " output(): missing result";
+    throw cms::Exception("TritonDataError") << name_ << " fromServer(): missing result";
   }
 
   if (byteSize_ != sizeof(DT)) {
-    throw cms::Exception("TritonDataError") << name_ << " output(): inconsistent byte size " << sizeof(DT)
+    throw cms::Exception("TritonDataError") << name_ << " fromServer(): inconsistent byte size " << sizeof(DT)
                                             << " (should be " << byteSize_ << " for " << dname_ << ")";
   }
 
@@ -164,9 +240,9 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   const uint8_t* r0;
   size_t contentByteSize;
   size_t expectedContentByteSize = nOutput * byteSize_ * batchSize_;
-  triton_utils::throwIfError(result_->RawData(name_, &r0, &contentByteSize), "output(): unable to get raw");
+  triton_utils::throwIfError(result_->RawData(name_, &r0, &contentByteSize), name_ + " fromServer(): unable to get raw");
   if (contentByteSize != expectedContentByteSize) {
-    throw cms::Exception("TritonDataError") << name_ << " output(): unexpected content byte size " << contentByteSize
+    throw cms::Exception("TritonDataError") << name_ << " fromServer(): unexpected content byte size " << contentByteSize
                                             << " (expected " << expectedContentByteSize << ")";
   }
 
@@ -182,8 +258,18 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 
 template <>
 void TritonInputData::reset() {
+  if (client_->serverType()==TritonServerType::LocalCPU) {
+    triton_utils::throwIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " reset(): unable to unregister shared memory region");
+    destroySharedMemoryRegion(shmName_, totalByteSize_, holderShm_);
+    totalByteSize_ = 0;
+    holderShm_ = nullptr;
+  }
+  else if (client_->serverType()==TritonServerType::LocalGPU) {
+    //todo
+  }
+  else
+    holder_.reset();
   data_->Reset();
-  holder_.reset();
 }
 
 template <>

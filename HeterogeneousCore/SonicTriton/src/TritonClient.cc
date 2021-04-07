@@ -201,6 +201,11 @@ void TritonClient::evaluate() {
     return;
   }
 
+  //set up shared memory for output
+  for (auto& element : output_) {
+    element.second.prepare();
+  }
+
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();
 

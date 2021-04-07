@@ -153,6 +153,7 @@ void TritonData<IO>::setBatchSize(unsigned bsize) {
     fullShape_[0] = batchSize_;
 }
 
+//io accessors
 template <>
 template <typename DT>
 TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
@@ -169,7 +170,6 @@ TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
   return ptr;
 }
 
-//io accessors
 template <>
 template <typename DT>
 void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
@@ -223,6 +223,28 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   }
 }
 
+//sets up shared memory for outputs, if possible
+template <>
+void TritonOutputData::prepare() {
+  //can't use shared memory if output size is not known
+  if (client_->serverType()==TritonServerType::Remote or variableDims_) return;
+
+  uint64_t nOutput = sizeShape();
+  totalByteSize_ = byteSize_*nOutput*batchSize_;
+  if (client_->serverType()==TritonServerType::LocalCPU) {
+    //type-agnostic: just use char
+    uint8_t* ptrShm;
+    createSharedMemoryRegion(shmName_, totalByteSize_, (void**)&ptrShm);
+    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " prepare(): unable to register shared memory region");
+    triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " prepare(): unable to set shared memory");
+    //keep shm ptr
+    holderShm_ = ptrShm;
+  }
+  else if (client_->serverType()==TritonServerType::LocalGPU) {
+    //todo
+  }
+}
+
 template <>
 template <typename DT>
 TritonOutput<DT> TritonOutputData::fromServer() const {
@@ -238,12 +260,23 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   uint64_t nOutput = sizeShape();
   TritonOutput<DT> dataOut;
   const uint8_t* r0;
-  size_t contentByteSize;
-  size_t expectedContentByteSize = nOutput * byteSize_ * batchSize_;
-  triton_utils::throwIfError(result_->RawData(name_, &r0, &contentByteSize), name_ + " fromServer(): unable to get raw");
-  if (contentByteSize != expectedContentByteSize) {
-    throw cms::Exception("TritonDataError") << name_ << " fromServer(): unexpected content byte size " << contentByteSize
-                                            << " (expected " << expectedContentByteSize << ")";
+  if (variableDims_) {
+    if (client_->serverType()==TritonServerType::LocalCPU) {
+      //outputs already loaded into ptr
+      r0 = (uint8_t*)holderShm_;
+    }
+    else if (client_->serverType()==TritonServerType::LocalGPU) {
+      //todo
+    }
+  }
+  else {
+    size_t contentByteSize;
+    size_t expectedContentByteSize = nOutput * byteSize_ * batchSize_;
+    triton_utils::throwIfError(result_->RawData(name_, &r0, &contentByteSize), name_ + " fromServer(): unable to get raw");
+    if (contentByteSize != expectedContentByteSize) {
+      throw cms::Exception("TritonDataError") << name_ << " fromServer(): unexpected content byte size " << contentByteSize
+                                              << " (expected " << expectedContentByteSize << ")";
+    }
   }
 
   const DT* r1 = reinterpret_cast<const DT*>(r0);
@@ -258,12 +291,8 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 
 template <>
 void TritonInputData::reset() {
-  if (client_->serverType()==TritonServerType::LocalCPU) {
-    triton_utils::throwIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " reset(): unable to unregister shared memory region");
-    destroySharedMemoryRegion(shmName_, totalByteSize_, holderShm_);
-    totalByteSize_ = 0;
-    holderShm_ = nullptr;
-  }
+  if (client_->serverType()==TritonServerType::LocalCPU)
+    resetShm();
   else if (client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
@@ -274,7 +303,22 @@ void TritonInputData::reset() {
 
 template <>
 void TritonOutputData::reset() {
+  if (!variableDims_){
+    if (client_->serverType()==TritonServerType::LocalCPU)
+      resetShm();
+    else if (client_->serverType()==TritonServerType::LocalGPU) {
+      //todo
+    }
+  }
   result_.reset();
+}
+
+template <typename IO>
+void TritonData<IO>::resetShm() {
+  triton_utils::throwIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " reset(): unable to unregister shared memory region");
+  destroySharedMemoryRegion(shmName_, totalByteSize_, holderShm_);
+  totalByteSize_ = 0;
+  holderShm_ = nullptr;
 }
 
 //explicit template instantiation declarations

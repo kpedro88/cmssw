@@ -260,7 +260,7 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   uint64_t nOutput = sizeShape();
   TritonOutput<DT> dataOut;
   const uint8_t* r0;
-  if (variableDims_) {
+  if (!variableDims_) {
     if (client_->serverType()==TritonServerType::LocalCPU) {
       //outputs already loaded into ptr
       r0 = (uint8_t*)holderShm_;

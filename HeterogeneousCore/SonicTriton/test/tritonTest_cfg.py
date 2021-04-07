@@ -14,6 +14,7 @@ options.register("modules", "TritonImageProducer", VarParsing.multiplicity.list,
 options.register("modelName","resnet50_netdef", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("mode","Async", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("verbose", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
+options.register("brief", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("unittest", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("device","auto", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("docker", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
@@ -109,6 +110,7 @@ for module in options.modules:
             processModule.nodeMax = cms.uint32(4000)
             processModule.edgeMin = cms.uint32(8000)
             processModule.edgeMax = cms.uint32(15000)
+        processModule.brief = cms.bool(options.brief)
     process.p += processModule
     keepMsgs.extend([module,module+':TritonClient'])
 

@@ -25,6 +25,7 @@ public:
   virtual ~SonicClientBase() = default;
 
   const std::string& debugName() const { return debugName_; }
+  const std::string& fullDebugName() const { return fullDebugName_; }
   const std::string& clientName() const { return clientName_; }
   SonicMode mode() const { return mode_; }
 

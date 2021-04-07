@@ -29,8 +29,9 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
       options_(params.getParameter<std::string>("modelName")) {
   //get appropriate server for this model
   edm::Service<TritonService> ts;
-  const auto& [url, serverType_] =
+  const auto& [url, serverType] =
       ts->serverAddress(options_.model_name_, params.getUntrackedParameter<std::string>("preferredServer"));
+  serverType_ = serverType;
   if (verbose_)
     edm::LogInfo(fullDebugName_) << "Using server: " << url;
   //enforce sync mode for fallback CPU server to avoid contention

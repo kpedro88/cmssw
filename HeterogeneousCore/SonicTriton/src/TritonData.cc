@@ -191,6 +191,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   int64_t nInput = sizeShape();
   //decide between shared memory or gRPC call
   if (client_->serverType()==TritonServerType::LocalCPU) {
+    LogDebug(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
     size_t byteSizePerBatch = byteSize_*nInput;
     totalByteSize_ = byteSizePerBatch*batchSize_;
     DT* ptrShm;
@@ -232,6 +233,7 @@ void TritonOutputData::prepare() {
   uint64_t nOutput = sizeShape();
   totalByteSize_ = byteSize_*nOutput*batchSize_;
   if (client_->serverType()==TritonServerType::LocalCPU) {
+    LogDebug(client_->fullDebugName()) << name_ << " prepare(): using CPU shared memory";
     //type-agnostic: just use char
     uint8_t* ptrShm;
     createSharedMemoryRegion(shmName_, totalByteSize_, (void**)&ptrShm);
@@ -260,14 +262,13 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   uint64_t nOutput = sizeShape();
   TritonOutput<DT> dataOut;
   const uint8_t* r0;
-  if (!variableDims_) {
-    if (client_->serverType()==TritonServerType::LocalCPU) {
-      //outputs already loaded into ptr
-      r0 = (uint8_t*)holderShm_;
-    }
-    else if (client_->serverType()==TritonServerType::LocalGPU) {
-      //todo
-    }
+  if (!variableDims_ and client_->serverType()==TritonServerType::LocalCPU) {
+    LogDebug(client_->fullDebugName()) << name_ << " fromServer(): using CPU shared memory";
+    //outputs already loaded into ptr
+    r0 = (uint8_t*)holderShm_;
+  }
+  else if (!variableDims_ and client_->serverType()==TritonServerType::LocalGPU) {
+    //todo
   }
   else {
     size_t contentByteSize;

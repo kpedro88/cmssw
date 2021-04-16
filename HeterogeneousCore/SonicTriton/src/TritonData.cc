@@ -190,7 +190,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 
   int64_t nInput = sizeShape();
   //decide between shared memory or gRPC call
-  if (client_->serverType()==TritonServerType::LocalCPU) {
+  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
     size_t byteSizePerBatch = byteSize_*nInput;
     totalByteSize_ = byteSizePerBatch*batchSize_;
@@ -210,7 +210,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     //but behaves as allocator<T,managed_shared_memory::segment_manager> (using boost::interprocess) in the LocalCPU case
     //todo: determine if this would work even if batch size and concrete shape not known before calling allocate(), and if it would actually be faster
   }
-  else if (client_->serverType()==TritonServerType::LocalGPU) {
+  else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
   else {
@@ -228,7 +228,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 template <>
 void TritonOutputData::prepare() {
   //can't use shared memory if output size is not known
-  if (client_->serverType()==TritonServerType::Remote or variableDims_) return;
+  if (!client_->useSharedMemory() or client_->serverType()==TritonServerType::Remote or variableDims_) return;
 
   uint64_t nOutput = sizeShape();
   totalByteSize_ = byteSize_*nOutput*batchSize_;
@@ -262,12 +262,12 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   uint64_t nOutput = sizeShape();
   TritonOutput<DT> dataOut;
   const uint8_t* r0;
-  if (!variableDims_ and client_->serverType()==TritonServerType::LocalCPU) {
+  if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " fromServer(): using CPU shared memory";
     //outputs already loaded into ptr
     r0 = (uint8_t*)holderShm_;
   }
-  else if (!variableDims_ and client_->serverType()==TritonServerType::LocalGPU) {
+  else if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
   else {
@@ -292,9 +292,9 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 
 template <>
 void TritonInputData::reset() {
-  if (client_->serverType()==TritonServerType::LocalCPU)
+  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU)
     resetShm();
-  else if (client_->serverType()==TritonServerType::LocalGPU) {
+  else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
   else
@@ -304,7 +304,7 @@ void TritonInputData::reset() {
 
 template <>
 void TritonOutputData::reset() {
-  if (!variableDims_){
+  if (client_->useSharedMemory() and !variableDims_){
     if (client_->serverType()==TritonServerType::LocalCPU)
       resetShm();
     else if (client_->serverType()==TritonServerType::LocalGPU) {

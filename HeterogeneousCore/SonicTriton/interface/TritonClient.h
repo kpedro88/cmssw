@@ -35,6 +35,8 @@ public:
   //accessors
   unsigned batchSize() const { return batchSize_; }
   bool verbose() const { return verbose_; }
+  bool useSharedMemory() const { return useSharedMemory_; }
+  void setUseSharedMemory(bool useShm) { useSharedMemory_ = useShm; }
   bool setBatchSize(unsigned bsize);
   void reset() override;
   bool noBatch() const { return noBatch_; }
@@ -60,6 +62,7 @@ protected:
   unsigned batchSize_;
   bool noBatch_;
   bool verbose_;
+  bool useSharedMemory_;
   TritonServerType serverType_;
 
   //IO pointers for triton

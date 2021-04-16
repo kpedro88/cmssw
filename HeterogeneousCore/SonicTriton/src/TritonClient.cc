@@ -26,6 +26,7 @@ namespace nic = ni::client;
 TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& debugName)
     : SonicClient(params, debugName, "TritonClient"),
       verbose_(params.getUntrackedParameter<bool>("verbose")),
+      useSharedMemory_(params.getUntrackedParameter<bool>("useSharedMemory")),
       options_(params.getParameter<std::string>("modelName")) {
   //get appropriate server for this model
   edm::Service<TritonService> ts;
@@ -361,6 +362,7 @@ void TritonClient::fillPSetDescription(edm::ParameterSetDescription& iDesc) {
   descClient.addUntracked<std::string>("preferredServer", "");
   descClient.addUntracked<unsigned>("timeout");
   descClient.addUntracked<bool>("verbose", false);
+  descClient.addUntracked<bool>("useSharedMemory", true);
   descClient.addUntracked<std::vector<std::string>>("outputs", {});
   iDesc.add<edm::ParameterSetDescription>("Client", descClient);
 }

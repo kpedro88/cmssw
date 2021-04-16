@@ -198,7 +198,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     createSharedMemoryRegion(shmName_, totalByteSize_, (void**)&ptrShm);
     //copy into shared memory region
     for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
-      std::memcpy(ptrShm + i0*byteSizePerBatch, data_in[i0].data(), byteSizePerBatch);
+      std::memcpy(ptrShm + i0*nInput, data_in[i0].data(), byteSizePerBatch);
     }
     triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " toServer(): unable to set shared memory");

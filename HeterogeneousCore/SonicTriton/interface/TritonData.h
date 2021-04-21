@@ -50,7 +50,7 @@ public:
   TritonInputContainer<DT> allocate(bool reserve=true);
   template <typename DT>
   void toServer(TritonInputContainer<DT> ptr);
-  void prepare();
+  bool prepare();
   template <typename DT>
   TritonOutput<DT> fromServer() const;
 
@@ -131,7 +131,7 @@ template <>
 template <typename DT>
 void TritonInputData::toServer(std::shared_ptr<TritonInput<DT>> ptr);
 template <>
-void TritonOutputData::prepare();
+bool TritonOutputData::prepare();
 template <>
 template <typename DT>
 TritonOutput<DT> TritonOutputData::fromServer() const;

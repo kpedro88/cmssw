@@ -226,10 +226,11 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 
 //sets up shared memory for outputs, if possible
 template <>
-void TritonOutputData::prepare() {
+bool TritonOutputData::prepare() {
   //can't use shared memory if output size is not known
-  if (!client_->useSharedMemory() or client_->serverType()==TritonServerType::Remote or variableDims_) return;
+  if (!client_->useSharedMemory() or client_->serverType()==TritonServerType::Remote or variableDims_) return true;
 
+  bool status = true;
   uint64_t nOutput = sizeShape();
   totalByteSize_ = byteSize_*nOutput*batchSize_;
   if (client_->serverType()==TritonServerType::LocalCPU) {
@@ -237,14 +238,15 @@ void TritonOutputData::prepare() {
     //type-agnostic: just use char
     uint8_t* ptrShm;
     createSharedMemoryRegion(shmName_, totalByteSize_, (void**)&ptrShm);
-    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " prepare(): unable to register shared memory region");
-    triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " prepare(): unable to set shared memory");
+    status &= triton_utils::warnIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " prepare(): unable to register shared memory region");
+    status &= triton_utils::warnIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " prepare(): unable to set shared memory");
     //keep shm ptr
     holderShm_ = ptrShm;
   }
   else if (client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
+  return status;
 }
 
 template <>

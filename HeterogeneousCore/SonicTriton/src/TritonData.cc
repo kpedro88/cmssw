@@ -11,6 +11,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+namespace bi = boost::interprocess;
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
 
@@ -157,10 +158,16 @@ void TritonData<IO>::setBatchSize(unsigned bsize) {
 template <>
 template <typename DT>
 TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
+  auto size = sizeShape();
+  //choose allocator: shared memory or default (heap)
+  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
+    LogDebug(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
+    segmentShm_ = bi::managed_shared_memory(bi::create_only, shmName_.c_str(), 10*((batchSize_+1)*sizeof(std::pmr::vector<DT>) + reserve ? batchSize_*size : 0));
+    memResource_ = ShmResource(segmentShm_.get_segment_manager());
+  }
   //automatically creates a vector for each batch entry
-  auto ptr = std::make_shared<TritonInput<DT>>(batchSize_);
+  auto ptr = std::make_shared<TritonInput<DT>>(batchSize_, !memResource_.is_null() ? &memResource_ : std::pmr::get_default_resource());
   if(reserve){
-    auto size = sizeShape();
     if(size>0){
       for(auto& vec: *ptr){
         vec.reserve(size);
@@ -191,7 +198,9 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   int64_t nInput = sizeShape();
   //decide between shared memory or gRPC call
   if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
-    LogDebug(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
+    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
+    triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " toServer(): unable to set shared memory");
+/*    LogDebug(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
     size_t byteSizePerBatch = byteSize_*nInput;
     totalByteSize_ = byteSizePerBatch*batchSize_;
     DT* ptrShm;
@@ -209,6 +218,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     //to do this at runtime would require a custom allocator that normally behaves as std::allocator,
     //but behaves as allocator<T,managed_shared_memory::segment_manager> (using boost::interprocess) in the LocalCPU case
     //todo: determine if this would work even if batch size and concrete shape not known before calling allocate(), and if it would actually be faster
+*/
   }
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
@@ -219,9 +229,9 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
       triton_utils::throwIfError(data_->AppendRaw(reinterpret_cast<const uint8_t*>(arr), nInput * byteSize_),
                                  name_ + " input(): unable to set data for batch entry " + std::to_string(i0));
     }
-    //keep input data in scope
-    holder_ = std::move(ptr);
   }
+  //keep input data in scope
+  holder_ = std::move(ptr);
 }
 
 //sets up shared memory for outputs, if possible
@@ -294,13 +304,13 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 
 template <>
 void TritonInputData::reset() {
-  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU)
-    resetShm();
+  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
+//    resetShm();
+  }
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
-  else
-    holder_.reset();
+  holder_.reset();
   data_->Reset();
 }
 

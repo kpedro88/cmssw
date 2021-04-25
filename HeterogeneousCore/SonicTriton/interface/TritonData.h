@@ -12,6 +12,9 @@
 #include <memory>
 #include <any>
 #include <atomic>
+#include <memory_resource>
+
+#include "boost/interprocess/managed_shared_memory.hpp"
 
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
@@ -21,7 +24,7 @@ class TritonClient;
 
 //aliases for local input and output types
 template <typename DT>
-using TritonInput = std::vector<std::vector<DT>>;
+using TritonInput = std::pmr::vector<std::pmr::vector<DT>>;
 template <typename DT>
 using TritonOutput = std::vector<edm::Span<const DT*>>;
 
@@ -37,6 +40,20 @@ public:
   using TensorMetadata = inference::ModelMetadataResponse_TensorMetadata;
   using ShapeType = std::vector<int64_t>;
   using ShapeView = edm::Span<ShapeType::const_iterator>;
+  using segment = boost::interprocess::managed_shared_memory;
+  using segment_manager = segment::segment_manager;
+
+  //helper class
+  class ShmResource : public std::pmr::memory_resource {
+  public:
+    ShmResource(segment_manager* manager=nullptr) : manager_(manager) {}
+    bool is_null() const { return !manager_; }
+  private:
+    segment_manager* manager_;
+    void* do_allocate(std::size_t bytes, std::size_t alignment) override { return manager_->allocate_aligned(bytes, alignment); }
+    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override { manager_->deallocate(p); }
+    bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override { return dynamic_cast<const ShmResource*>(&other) != nullptr; }
+  };
 
   //constructor
   TritonData(const std::string& name, const TensorMetadata& model_info, TritonClient* client, const std::string& pid);
@@ -109,6 +126,8 @@ private:
   inference::DataType dtype_;
   int64_t byteSize_;
   size_t totalByteSize_;
+  segment segmentShm_;
+  ShmResource memResource_;
   std::any holder_;
   void* holderShm_;
   std::shared_ptr<Result> result_;

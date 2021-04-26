@@ -12,6 +12,7 @@
 #include <memory>
 #include <any>
 #include <atomic>
+#include <memory_resource>
 
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
@@ -21,13 +22,33 @@ class TritonClient;
 
 //aliases for local input and output types
 template <typename DT>
-using TritonInput = std::vector<std::vector<DT>>;
+using TritonInput = std::pmr::vector<std::pmr::vector<DT>>;
 template <typename DT>
 using TritonOutput = std::vector<edm::Span<const DT*>>;
 
 //other useful typdefs
 template <typename DT>
 using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
+
+//helper class for shared memory
+template <typename DT>
+class TritonShmResource : public std::pmr::memory_resource {
+public:
+  TritonShmResource(std::string name, size_t size);
+  virtual ~TritonShmResource();
+  DT* addr() { return addr_; }
+  void close();
+private:
+  //required interface
+  void* do_allocate(std::size_t bytes, std::size_t alignment) override;
+  void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override;
+  bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override;
+  //member variables
+  std::string name_;
+  size_t size_;
+  size_t counter_;
+  DT* addr_;
+};
 
 //store all the info needed for triton input and output
 template <typename IO>
@@ -110,7 +131,7 @@ private:
   int64_t byteSize_;
   size_t totalByteSize_;
   std::any holder_;
-  void* holderShm_;
+  std::shared_ptr<std::pmr::memory_resource> memResource_;
   std::shared_ptr<Result> result_;
 };
 

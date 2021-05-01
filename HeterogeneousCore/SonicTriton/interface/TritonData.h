@@ -10,7 +10,6 @@
 #include <numeric>
 #include <algorithm>
 #include <memory>
-#include <any>
 #include <atomic>
 #include <memory_resource>
 
@@ -31,12 +30,11 @@ template <typename DT>
 using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
 
 //helper class for shared memory
-template <typename DT>
 class TritonShmResource : public std::pmr::memory_resource {
 public:
   TritonShmResource(std::string name, size_t size);
   virtual ~TritonShmResource();
-  DT* addr() { return addr_; }
+  uint8_t* addr() { return addr_; }
   void close();
 private:
   //required interface
@@ -47,7 +45,7 @@ private:
   std::string name_;
   size_t size_;
   size_t counter_;
-  DT* addr_;
+  uint8_t* addr_;
 };
 
 //store all the info needed for triton input and output
@@ -130,7 +128,7 @@ private:
   inference::DataType dtype_;
   int64_t byteSize_;
   size_t totalByteSize_;
-  std::any holder_;
+  std::shared_ptr<void> holder_;
   std::shared_ptr<std::pmr::memory_resource> memResource_;
   std::shared_ptr<Result> result_;
 };

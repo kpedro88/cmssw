@@ -1,5 +1,4 @@
 #include "HeterogeneousCore/SonicTriton/interface/TritonEDProducer.h"
-#include "HeterogeneousCore/SonicTriton/interface/triton_utils.h"
 
 #include "FWCore/ParameterSet/interface/FileInPath.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
@@ -10,7 +9,6 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <random>
 #include <map>
 
 class TritonImageProducer : public TritonEDProducer<> {
@@ -32,25 +30,13 @@ public:
     }
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
-    //get event-based seed for RNG
-    unsigned int runNum_uint = static_cast<unsigned int>(iEvent.id().run());
-    unsigned int lumiNum_uint = static_cast<unsigned int>(iEvent.id().luminosityBlock());
-    unsigned int evNum_uint = static_cast<unsigned int>(iEvent.id().event());
-    std::uint32_t seed = (lumiNum_uint << 10) + (runNum_uint << 20) + evNum_uint;
-    std::mt19937 rng(seed);
-    std::uniform_real_distribution<float> randfloat(0.f,1.f);
-
     client_->setBatchSize(batchSize_);
     // create an npix x npix x ncol image w/ arbitrary color value
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
     auto data1 = input1.allocate<float>();
     for (auto& vdata1: *data1){
-      edm::LogInfo(debugName_) << "input before = " << triton_utils::printColl(vdata1, ",");
-      for (unsigned i = 0; i < input1.sizeDims(); ++i){
-        vdata1.push_back(randfloat(rng));
-      }
-      edm::LogInfo(debugName_) << "input after = " << triton_utils::printColl(vdata1, ",");
+      vdata1.assign(input1.sizeDims(), 0.5f);
     }
     // convert to server format
     input1.toServer(data1);

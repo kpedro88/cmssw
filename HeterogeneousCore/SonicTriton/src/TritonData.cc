@@ -29,8 +29,7 @@ namespace nvidia {
 //the shared memory region is created when the memory resource is initialized
 //allocate() and deallocate() just increment and decrement a counter that keeps track of position in shm region
 //region is actually destroyed in destructor
-template <typename DT>
-TritonShmResource<DT>::TritonShmResource(std::string name, size_t size) : name_(name), size_(size), counter_(0), addr_(nullptr) {
+TritonShmResource::TritonShmResource(std::string name, size_t size) : name_(name), size_(size), counter_(0), addr_(nullptr) {
   //get shared memory region descriptor
   int shm_fd = shm_open(name_.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (shm_fd == -1)
@@ -43,7 +42,7 @@ TritonShmResource<DT>::TritonShmResource(std::string name, size_t size) : name_(
 
   //map to process address space
   constexpr size_t offset(0);
-  addr_ = (DT*)mmap(NULL, size_, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  addr_ = (uint8_t*)mmap(NULL, size_, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if(addr_ == MAP_FAILED)
     throw cms::Exception("TritonSharedMemoryError") << "unable to map to process address space for shared memory key: " << name_;
 
@@ -52,8 +51,7 @@ TritonShmResource<DT>::TritonShmResource(std::string name, size_t size) : name_(
     throw cms::Exception("TritonSharedMemoryError") << "unable to close descriptor for shared memory key: " << name_;
 }
 
-template <typename DT>
-void TritonShmResource<DT>::close() {
+void TritonShmResource::close() {
   //unmap
   int tmp_fd = munmap(addr_, size_);
   if (tmp_fd == -1)
@@ -65,8 +63,7 @@ void TritonShmResource<DT>::close() {
     throw cms::Exception("TritonSharedMemoryError") << "unable to unlink for shared memory key: " << name_;
 }
 
-template <typename DT>
-TritonShmResource<DT>::~TritonShmResource() {
+TritonShmResource::~TritonShmResource() {
   //avoid throwing in destructor
   try {
     close();
@@ -74,27 +71,22 @@ TritonShmResource<DT>::~TritonShmResource() {
   catch (...) {}
 }
 
-template <typename DT>
-void* TritonShmResource<DT>::do_allocate(std::size_t bytes, std::size_t alignment) {
+void* TritonShmResource::do_allocate(std::size_t bytes, std::size_t alignment) {
   size_t old_counter = counter_;
   counter_ += bytes;
   if(counter_>size_)
     throw std::runtime_error("Attempt to allocate "+std::to_string(bytes)+" bytes in region with only "+std::to_string(size_-old_counter)+" bytes free");
   void* result = addr_ + old_counter;
-  std::cout << "TritonShmResource::allocate() : " << bytes << " bytes, " << size_-counter_ << " remaining (" << result << ")" << std::endl;
   return result;
 }
 
-template <typename DT>
-void TritonShmResource<DT>::do_deallocate(void* p, std::size_t bytes, std::size_t alignment) {
+void TritonShmResource::do_deallocate(void* p, std::size_t bytes, std::size_t alignment) {
   if(bytes>counter_)
     throw std::runtime_error("Attempt to deallocate "+std::to_string(bytes)+" bytes in region with only "+std::to_string(counter_)+" bytes used");
   counter_ -= bytes;
-  std::cout << "TritonShmResource::deallocate() : " << bytes << " bytes, " << counter_ << " remaining" << std::endl;
 }
 
-template <typename DT>
-bool TritonShmResource<DT>::do_is_equal(const std::pmr::memory_resource& other) const noexcept {
+bool TritonShmResource::do_is_equal(const std::pmr::memory_resource& other) const noexcept {
   return dynamic_cast<const TritonShmResource*>(&other) != nullptr;
 }
 
@@ -198,12 +190,11 @@ TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
   auto size = sizeShape();
   size_t byteSizePerBatch = byteSize_*size;
   totalByteSize_ = byteSizePerBatch*batchSize_;
-  std::cout << "totalByteSize = size * byteSize * batchSize = " << size << " * " << byteSize_ << " * " << batchSize_ << " = " << totalByteSize_ << std::endl;
   //choose allocator: shared memory or default (heap)
   if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
     edm::LogInfo(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
     //allocated bytes include space for vector overhead
-    memResource_ = std::make_shared<TritonShmResource<DT>>(shmName_, (batchSize_+1)*sizeof(std::pmr::vector<DT>) + totalByteSize_);
+    memResource_ = std::make_shared<TritonShmResource>(shmName_, (batchSize_)*sizeof(std::pmr::vector<DT>) + totalByteSize_);
   }
   //automatically creates a vector for each batch entry
   auto ptr = std::make_shared<TritonInput<DT>>(batchSize_, memResource_ ? memResource_.get() : std::pmr::get_default_resource());
@@ -219,9 +210,6 @@ template <>
 template <typename DT>
 void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   const auto& data_in = *ptr;
-  for(unsigned i = 0; i < batchSize_; ++i){
-    edm::LogInfo(client_->fullDebugName()) << name_ << "[" << i << "] = " << triton_utils::printColl(data_in[i], ",");
-  }
 
   //check batch size
   if (data_in.size() != batchSize_) {
@@ -250,8 +238,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     }*/
     triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
     //offset calculated to exclude vector overhead at beginning of shm region
-    size_t offset = (data_in[0].data() - std::static_pointer_cast<TritonShmResource<DT>>(memResource_)->addr());
-    std::cout << shmName_ << " offset = " << offset << std::endl;
+    size_t offset = ((uint8_t*)data_in[0].data() - std::static_pointer_cast<TritonShmResource>(memResource_)->addr());
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, offset), name_ + " toServer(): unable to set shared memory");
     //possible future enhancement:
     //modify allocate() so input is written directly into shared memory, w/o memcpy
@@ -270,7 +257,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     }
   }
   //keep input data in scope
-  holder_ = std::move(ptr);
+  holder_ = ptr;
 }
 
 //sets up shared memory for outputs, if possible
@@ -284,8 +271,7 @@ bool TritonOutputData::prepare() {
   totalByteSize_ = byteSize_*nOutput*batchSize_;
   if (client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " prepare(): using CPU shared memory";
-    //type-agnostic: just use char
-    memResource_ = std::make_shared<TritonShmResource<uint8_t>>(shmName_, totalByteSize_);
+    memResource_ = std::make_shared<TritonShmResource>(shmName_, totalByteSize_);
     status &= triton_utils::warnIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " prepare(): unable to register shared memory region");
     status &= triton_utils::warnIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " prepare(): unable to set shared memory");
   }
@@ -313,7 +299,7 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " fromServer(): using CPU shared memory";
     //outputs already loaded into ptr
-    r0 = std::static_pointer_cast<TritonShmResource<uint8_t>>(memResource_)->addr();
+    r0 = std::static_pointer_cast<TritonShmResource>(memResource_)->addr();
   }
   else if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
@@ -340,13 +326,12 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 
 template <>
 void TritonInputData::reset() {
+  holder_.reset();
   if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU)
     resetShm();
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
-  else
-    holder_.reset();
   data_->Reset();
 }
 

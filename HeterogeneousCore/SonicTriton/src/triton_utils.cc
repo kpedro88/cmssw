@@ -36,5 +36,3 @@ template std::string triton_utils::printColl(const edm::Span<std::vector<int64_t
 template std::string triton_utils::printColl(const std::vector<uint8_t>& coll, const std::string& delim);
 template std::string triton_utils::printColl(const std::vector<float>& coll, const std::string& delim);
 template std::string triton_utils::printColl(const std::unordered_set<std::string>& coll, const std::string& delim);
-template std::string triton_utils::printColl(const std::pmr::vector<float>& coll, const std::string& delim);
-template std::string triton_utils::printColl(const std::pmr::vector<int64_t>& coll, const std::string& delim);

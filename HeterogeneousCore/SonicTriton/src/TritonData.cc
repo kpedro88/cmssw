@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <new>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -71,6 +70,11 @@ TritonShmResource::~TritonShmResource() {
   catch (...) {}
 }
 
+//todo: make this resizeable with mremap
+//requires a better shm interface from Triton: need to be able to specify non-contiguous chunks
+//currently, all inner vectors, including overhead, are in one contiguous chunk
+//this assumes all push_back() calls are in order, which might not be true for resizeable usage
+//each inner vector should have its own shm chunk in resizeable case (overhead on heap)
 void* TritonShmResource::do_allocate(std::size_t bytes, std::size_t alignment) {
   size_t old_counter = counter_;
   counter_ += bytes;
@@ -104,6 +108,7 @@ TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::Tensor
       batchSize_(0),
       fullShape_(dims_),
       shape_(fullShape_.begin() + (noBatch_ ? 0 : 1), fullShape_.end()),
+      lockShape_(false),
       variableDims_(anyNeg(shape_)),
       productDims_(variableDims_ ? -1 : dimProduct(shape_)),
       dname_(model_info.datatype()),
@@ -134,6 +139,12 @@ std::string TritonOutputData::xput() const { return "output"; }
 
 //setters
 template <typename IO>
+void TritonData<IO>::checkLockShape() const {
+  if(lockShape_)
+    throw cms::Exception("TritonDataError") << name_ << " setShape(): disabled because allocate() was already called with a concrete shape and shared memory";
+}
+
+template <typename IO>
 bool TritonData<IO>::setShape(const TritonData<IO>::ShapeType& newShape, bool canThrow) {
   bool result = true;
   for (unsigned i = 0; i < newShape.size(); ++i) {
@@ -145,11 +156,11 @@ bool TritonData<IO>::setShape(const TritonData<IO>::ShapeType& newShape, bool ca
 template <typename IO>
 bool TritonData<IO>::setShape(unsigned loc, int64_t val, bool canThrow) {
   std::stringstream msg;
-  unsigned full_loc = loc + (noBatch_ ? 0 : 1);
+  unsigned locFull = fullLoc(loc);
 
   //check boundary
-  if (full_loc >= fullShape_.size()) {
-    msg << name_ << " setShape(): dimension " << full_loc << " out of bounds (" << fullShape_.size() << ")";
+  if (locFull >= fullShape_.size()) {
+    msg << name_ << " setShape(): dimension " << locFull << " out of bounds (" << fullShape_.size() << ")";
     if (canThrow)
       throw cms::Exception("TritonDataError") << msg.str();
     else {
@@ -158,9 +169,9 @@ bool TritonData<IO>::setShape(unsigned loc, int64_t val, bool canThrow) {
     }
   }
 
-  if (val != fullShape_[full_loc]) {
-    if (dims_[full_loc] == -1) {
-      fullShape_[full_loc] = val;
+  if (val != fullShape_[locFull]) {
+    if (dims_[locFull] == -1) {
+      fullShape_[locFull] = val;
       return true;
     } else {
       msg << name_ << " setShape(): attempt to change value of non-variable shape dimension " << loc;
@@ -191,14 +202,20 @@ TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
   size_t byteSizePerBatch = byteSize_*size;
   totalByteSize_ = byteSizePerBatch*batchSize_;
   //choose allocator: shared memory or default (heap)
-  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
-    edm::LogInfo(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
+  //shared memory can only be used at this stage if the batch size and shape are set
+  bool concreteShape = batchSize_>0 and !anyNeg(shape_);
+  if (client_->useSharedMemory() and concreteShape and client_->serverType()==TritonServerType::LocalCPU) {
+    edm::LogInfo(client_->fullDebugName()) << name_ << " allocate(): using CPU shared memory";
     //allocated bytes include space for vector overhead
     memResource_ = std::make_shared<TritonShmResource>(shmName_, (batchSize_)*sizeof(std::pmr::vector<DT>) + totalByteSize_);
+    //prevent changing batch size or shape
+    lockShape_ = true;
+    client_->lockBatch();
   }
-  //automatically creates a vector for each batch entry
+  //automatically creates a vector for each batch entry (if batch size known)
   auto ptr = std::make_shared<TritonInput<DT>>(batchSize_, memResource_ ? memResource_.get() : std::pmr::get_default_resource());
-  if(reserve and !anyNeg(shape_)){
+  //can only reserve if batch size and shape are set
+  if(reserve and concreteShape){
     for(auto& vec: *ptr){
       vec.reserve(size);
     }
@@ -229,22 +246,22 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
   if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU) {
     size_t byteSizePerBatch = byteSize_*nInput;
     totalByteSize_ = byteSizePerBatch*batchSize_;
-/*    edm::LogInfo(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
-    memResource_ = std::make_shared<TritonShmResource<DT>>(shmName_, totalByteSize_);
-    //todo: just use allocate again here
-    //copy into shared memory region
-    for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
-      std::memcpy(ptrShm + i0*nInput, data_in[i0].data(), byteSizePerBatch);
-    }*/
+    size_t offset = 0;
+    //check if more-efficient shm approach could not be used
+    if(!memResource_) {
+      edm::LogInfo(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
+      memResource_ = std::make_shared<TritonShmResource>(shmName_, totalByteSize_);
+      //copy into shared memory region
+      for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
+        std::memcpy(memResource_->addr() + i0*byteSizePerBatch, data_in[i0].data(), byteSizePerBatch);
+      }
+    }
+    else {
+      //offset calculated to exclude vector overhead at beginning of shm region
+      offset = ((uint8_t*)data_in[0].data() - memResource_->addr());
+    }
     triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
-    //offset calculated to exclude vector overhead at beginning of shm region
-    size_t offset = ((uint8_t*)data_in[0].data() - std::static_pointer_cast<TritonShmResource>(memResource_)->addr());
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, offset), name_ + " toServer(): unable to set shared memory");
-    //possible future enhancement:
-    //modify allocate() so input is written directly into shared memory, w/o memcpy
-    //to do this at runtime would require a custom allocator that normally behaves as std::allocator,
-    //but behaves as allocator<T,managed_shared_memory::segment_manager> (using boost::interprocess) in the LocalCPU case
-    //todo: determine if this would work even if batch size and concrete shape not known before calling allocate(), and if it would actually be faster
   }
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
@@ -264,7 +281,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 template <>
 bool TritonOutputData::prepare() {
   //can't use shared memory if output size is not known
-  if (!client_->useSharedMemory() or client_->serverType()==TritonServerType::Remote or variableDims_) return true;
+  if (!client_->useSharedMemory() or variableDims_ or client_->serverType()==TritonServerType::Remote) return true;
 
   bool status = true;
   uint64_t nOutput = sizeShape();
@@ -296,12 +313,13 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   uint64_t nOutput = sizeShape();
   TritonOutput<DT> dataOut;
   const uint8_t* r0;
-  if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalCPU) {
+  bool canUseShm = client_->useSharedMemory() and !variableDims_;
+  if (canUseShm and client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " fromServer(): using CPU shared memory";
     //outputs already loaded into ptr
-    r0 = std::static_pointer_cast<TritonShmResource>(memResource_)->addr();
+    r0 = memResource_->addr();
   }
-  else if (client_->useSharedMemory() and !variableDims_ and client_->serverType()==TritonServerType::LocalGPU) {
+  else if (canUseShm and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
   else {
@@ -333,6 +351,15 @@ void TritonInputData::reset() {
     //todo
   }
   data_->Reset();
+  //reset batch and shape
+  if(!noBatch_) batchSize_ = 0;
+  if(variableDims_){
+    for(unsigned i = 0; i < shape_.size(); ++i){
+      unsigned locFull = fullLoc(i);
+      fullShape_[locFull] = dims_[locFull];
+    }
+  }
+  lockShape_ = false;
 }
 
 template <>

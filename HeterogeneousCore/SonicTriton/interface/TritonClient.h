@@ -61,6 +61,7 @@ protected:
   unsigned maxBatchSize_;
   unsigned batchSize_;
   bool noBatch_;
+  bool lockBatch_;
   bool verbose_;
   bool useSharedMemory_;
   TritonServerType serverType_;
@@ -79,6 +80,7 @@ private:
 
   //private accessors only used by data
   auto client() { return client_.get(); }
+  void lockBatch() { lockBatch_ = true; }
 };
 
 #endif

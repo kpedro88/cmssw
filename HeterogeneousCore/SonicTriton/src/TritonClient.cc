@@ -25,6 +25,7 @@ namespace nic = ni::client;
 
 TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& debugName)
     : SonicClient(params, debugName, "TritonClient"),
+      lockBatch_(false),
       verbose_(params.getUntrackedParameter<bool>("verbose")),
       useSharedMemory_(params.getUntrackedParameter<bool>("useSharedMemory")),
       options_(params.getParameter<std::string>("modelName")) {
@@ -151,7 +152,9 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
 }
 
 bool TritonClient::setBatchSize(unsigned bsize) {
-  if (bsize > maxBatchSize_) {
+  if(lockBatch_)
+    throw cms::Exception("TritonClientError") << fullDebugName_ << " setBatchSize(): disabled because allocate() was already called with a concrete shape and shared memory";
+  else if (bsize > maxBatchSize_) {
     edm::LogWarning(fullDebugName_) << "Requested batch size " << bsize << " exceeds server-specified max batch size "
                                     << maxBatchSize_ << ". Batch size will remain as" << batchSize_;
     return false;
@@ -169,6 +172,7 @@ bool TritonClient::setBatchSize(unsigned bsize) {
 }
 
 void TritonClient::reset() {
+  lockBatch_ = false;
   for (auto& element : input_) {
     element.second.reset();
   }

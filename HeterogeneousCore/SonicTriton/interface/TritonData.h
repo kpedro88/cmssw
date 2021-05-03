@@ -61,8 +61,8 @@ public:
   TritonData(const std::string& name, const TensorMetadata& model_info, TritonClient* client, const std::string& pid);
 
   //some members can be modified
-  bool setShape(const ShapeType& newShape) { return setShape(newShape, true); }
-  bool setShape(unsigned loc, int64_t val) { return setShape(loc, val, true); }
+  bool setShape(const ShapeType& newShape) { checkLockShape(); return setShape(newShape, true); }
+  bool setShape(unsigned loc, int64_t val) { checkLockShape(); return setShape(loc, val, true); }
 
   //io accessors
   template <typename DT>
@@ -88,7 +88,9 @@ public:
 private:
   friend class TritonClient;
 
-  //private accessors only used by client
+  //private accessors only used internally or by client
+  unsigned fullLoc(unsigned loc) const { return loc + (noBatch_ ? 0 : 1); }
+  void checkLockShape() const;
   bool setShape(const ShapeType& newShape, bool canThrow);
   bool setShape(unsigned loc, int64_t val, bool canThrow);
   void setBatchSize(unsigned bsize);
@@ -122,6 +124,7 @@ private:
   unsigned batchSize_;
   ShapeType fullShape_;
   ShapeView shape_;
+  bool lockShape_;
   bool variableDims_;
   int64_t productDims_;
   std::string dname_;
@@ -129,7 +132,7 @@ private:
   int64_t byteSize_;
   size_t totalByteSize_;
   std::shared_ptr<void> holder_;
-  std::shared_ptr<std::pmr::memory_resource> memResource_;
+  std::shared_ptr<TritonShmResource> memResource_;
   std::shared_ptr<Result> result_;
 };
 

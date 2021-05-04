@@ -177,7 +177,7 @@ start_docker(){
 	done
 
 	$DRYRUN $DOCKER run -d --name ${SERVER} \
-		--shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
+		--shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --ipc="host" --cap-add=IPC_OWNER \
 		-p${HTTPPORT}:${HTTPPORT} -p${GRPCPORT}:${GRPCPORT} -p${METRPORT}:${METRPORT} $EXTRA $MOUNTARGS \
 		${IMAGE} tritonserver $PORTARGS $REPOARGS $VERBOSE
 }

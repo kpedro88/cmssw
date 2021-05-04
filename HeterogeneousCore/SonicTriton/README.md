@@ -30,6 +30,8 @@ The model information from the server can be printed by enabling `verbose` outpu
 * `preferredServer`: name of preferred server, for testing (see [Services](#services) below)
 * `timeout`: maximum allowed time for a request
 * `outputs`: optional, specify which output(s) the server should send
+* `verbose`: enable verbose printouts (default: false)
+* `useSharedMemory`: enable use of shared memory (see [below](#shared-memory)) with local servers (default: true)
 
 The batch size should be set using the client accessor, in order to ensure a consistent value across all inputs:
 * `setBatchSize()`: set a new batch size
@@ -51,16 +53,32 @@ To update the `TritonData` shape in the variable-dimension case:
 There are specific local input and output containers that should be used in producers.
 Here, `T` is a primitive type, and the two aliases listed below are passed to `TritonInputData::toServer()`
 and returned by `TritonOutputData::fromServer()`, respectively:
-* `TritonInputContainer<T> = std::shared_ptr<TritonInput<T>> = std::shared_ptr<std::vector<std::vector<T>>>`
+* `TritonInputContainer<T> = std::shared_ptr<TritonInput<T>> = std::shared_ptr<std::pmr::vector<std::pmr::vector<T>>>`
 * `TritonOutput<T> = std::vector<edm::Span<const T*>>`
 
-The `TritonInput` type expects one vector per batch entry (i.e. the size of the outer vector is the batch size).
-To simplify the creation of the `TritonInputContainer`, a helper function is available.
-This helper function will create one vector per batch entry.
-(Therefore, `TritonClient::setBatchSize()` should be called, if necessary, before calling the helper.)
+The `TritonInputContainer` object should be created using the helper function described below.
+It expects one vector per batch entry (i.e. the size of the outer vector is the batch size).
+Therefore, `TritonClient::setBatchSize()` should be called, if necessary, before calling the helper.
 It will also reserve the expected size of the input in each inner vector (by default),
 if the concrete shape is available (i.e. `setShape()` was already called, if the input has variable dimensions).
+`std::pmr::vector` is used in order to be able to switch between heap memory and shared memory at runtime (see [below](#shared-memory)).
 * `allocate<T>()`: return a `TritonInputContainer` properly allocated with respect to batch and input sizes
+
+### Shared memory
+
+If the local fallback server (see [Services](#services) below) is in use,
+input and output data can be transferred via shared memory rather than gRPC.
+This is more efficient for some algorithms.
+For inputs, there are two ways to use shared memory:
+1. Write directly into the shared memory region;
+2. Write into heap memory as usual, and then `memcpy` into the shared memory region.
+SONIC Triton will automatically use the first, more efficient method if the batch size and concrete shape are available
+`allocate()` is called; otherwise, the second method will be used.
+If shared memory is not more efficient for an algorithm, it can be disabled in the Python configuration for the client.
+
+For outputs, shared memory can only be used if the batch size and concrete shape are known in advance,
+because the shared memory region for the output must be registered before the inference call is made.
+As with the inputs, this is handled automatically, and the use of shared memory can be disabled if desired.
 
 ## Modules
 

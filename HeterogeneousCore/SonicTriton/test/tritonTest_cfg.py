@@ -90,12 +90,13 @@ for module in options.modules:
                 modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/{}/config.pbtxt".format(models[module])),
                 verbose = cms.untracked.bool(options.verbose),
                 allowedTries = cms.untracked.uint32(options.tries),
+                useSharedMemory = cms.untracked.bool(True),
             )
         )
     )
     processModule = getattr(process, module)
     if module=="TritonImageProducer":
-        processModule.batchSize = cms.uint32(1)
+        processModule.batchSize = cms.int32(1)
         processModule.topN = cms.uint32(5)
         processModule.imageList = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/resnet50_netdef/resnet50_labels.txt")
     elif "TritonGraph" in module:

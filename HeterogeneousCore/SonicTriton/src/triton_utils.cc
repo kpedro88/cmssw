@@ -20,13 +20,22 @@ namespace triton_utils {
 
   void throwIfError(const Error& err, std::string_view msg) {
     if (!err.IsOk())
-      throw cms::Exception("TritonServerFailure") << msg << ": " << err;
+      throw cms::Exception("TritonFailure") << msg << (err.Message().empty() ? "" : ": " + err.Message());
   }
 
   bool warnIfError(const Error& err, std::string_view msg) {
     if (!err.IsOk())
-      edm::LogWarning("TritonServerWarning") << msg << ": " << err;
+      edm::LogWarning("TritonWarning") << msg << (err.Message().empty() ? "" : ": " + err.Message());
     return err.IsOk();
+  }
+
+  bool warnOrThrowIfError(const Error& err, std::string_view msg, bool canThrow) {
+    if(!canThrow) throwIfError(err, msg);
+    return canThrow ? warnIfError(err, msg) : err.IsOk();
+  }
+
+  void warnOrThrow(std::string_view msg, bool canThrow) {
+    warnOrThrowIfError(Error("client-side problem"), msg, canThrow);
   }
 
 }  // namespace triton_utils

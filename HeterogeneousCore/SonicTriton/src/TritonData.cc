@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <cerrno>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -28,46 +29,53 @@ namespace nvidia {
 //the shared memory region is created when the memory resource is initialized
 //allocate() and deallocate() just increment and decrement a counter that keeps track of position in shm region
 //region is actually destroyed in destructor
-TritonShmResource::TritonShmResource(std::string name, size_t size) : name_(name), size_(size), counter_(0), addr_(nullptr) {
+TritonShmResource::TritonShmResource(std::string name, size_t size, bool canThrow) : name_(name), size_(size), counter_(0), addr_(nullptr) {
   //get shared memory region descriptor
   int shm_fd = shm_open(name_.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (shm_fd == -1)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to get shared memory descriptor for key: " << name_;
+    triton_utils::warnOrThrow("unable to get shared memory descriptor for key: " + name_, canThrow);
 
   //extend shared memory object
   int res = ftruncate(shm_fd, size_);
   if (res == -1)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to initialize shared memory key " << name_ << " to requested size: " << size_;
+    triton_utils::warnOrThrow("unable to initialize shared memory key " + name_ + " to requested size: " + std::to_string(size_), canThrow);
 
   //map to process address space
   constexpr size_t offset(0);
   addr_ = (uint8_t*)mmap(NULL, size_, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if(addr_ == MAP_FAILED)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to map to process address space for shared memory key: " << name_;
+    triton_utils::warnOrThrow("unable to map to process address space for shared memory key: " + name_, canThrow);
 
   //close descriptor
   if(::close(shm_fd) == -1)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to close descriptor for shared memory key: " << name_;
+    triton_utils::warnOrThrow("unable to close descriptor for shared memory key: " + name_, canThrow);
 }
 
-void TritonShmResource::close() {
+bool TritonShmResource::remap(size_t newSize, bool canThrow) {
+  void* new_addr = mremap(addr_, size_, newSize, MREMAP_MAYMOVE);
+  if(new_addr == (void*)-1){
+    triton_utils::warnOrThrow("unable to remap shared memory key " + name_ + " from " + std::to_string(size_) + " to " + std::to_string(newSize) + " bytes (errno "+std::to_string(errno)+")", canThrow);
+    return false;
+  }
+  addr_ = (uint8_t*)new_addr;
+  return true;
+}
+
+void TritonShmResource::close(bool canThrow) {
   //unmap
   int tmp_fd = munmap(addr_, size_);
   if (tmp_fd == -1)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to munmap for shared memory key: " << name_;
+    triton_utils::warnOrThrow("unable to munmap for shared memory key: " + name_, canThrow);
 
   //unlink
   int shm_fd = shm_unlink(name_.c_str());
   if (shm_fd == -1)
-    throw cms::Exception("TritonSharedMemoryError") << "unable to unlink for shared memory key: " << name_;
+    triton_utils::warnOrThrow("unable to unlink for shared memory key: " + name_, canThrow);
 }
 
 TritonShmResource::~TritonShmResource() {
   //avoid throwing in destructor
-  try {
-    close();
-  }
-  catch (...) {}
+  close(false);
 }
 
 //todo: make this resizeable with mremap
@@ -109,6 +117,7 @@ TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::Tensor
       fullShape_(dims_),
       shape_(fullShape_.begin() + (noBatch_ ? 0 : 1), fullShape_.end()),
       lockShape_(false),
+      concreteShape_(false),
       variableDims_(anyNeg(shape_)),
       productDims_(variableDims_ ? -1 : dimProduct(shape_)),
       dname_(model_info.datatype()),
@@ -119,6 +128,14 @@ TritonData<IO>::TritonData(const std::string& name, const TritonData<IO>::Tensor
   IO* iotmp;
   createObject(&iotmp);
   data_.reset(iotmp);
+}
+
+template <typename IO>
+TritonData<IO>::~TritonData() {
+  if(memResource_){
+    triton_utils::warnIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " destructor: unable to unregister shared memory region");
+    memResource_.reset();
+  }
 }
 
 template <>
@@ -161,12 +178,8 @@ bool TritonData<IO>::setShape(unsigned loc, int64_t val, bool canThrow) {
   //check boundary
   if (locFull >= fullShape_.size()) {
     msg << name_ << " setShape(): dimension " << locFull << " out of bounds (" << fullShape_.size() << ")";
-    if (canThrow)
-      throw cms::Exception("TritonDataError") << msg.str();
-    else {
-      edm::LogWarning("TritonDataWarning") << msg.str();
-      return false;
-    }
+    triton_utils::warnOrThrow(msg.str(), canThrow);
+    return false;
   }
 
   if (val != fullShape_[locFull]) {
@@ -175,12 +188,8 @@ bool TritonData<IO>::setShape(unsigned loc, int64_t val, bool canThrow) {
       return true;
     } else {
       msg << name_ << " setShape(): attempt to change value of non-variable shape dimension " << loc;
-      if (canThrow)
-        throw cms::Exception("TritonDataError") << msg.str();
-      else {
-        edm::LogWarning("TritonDataError") << msg.str();
-        return false;
-      }
+      triton_utils::warnOrThrow(msg.str(), canThrow);
+      return false;
     }
   }
 
@@ -194,6 +203,31 @@ void TritonData<IO>::setBatchSize(unsigned bsize) {
     fullShape_[0] = batchSize_;
 }
 
+//create a memory resource if none exists;
+//otherwise, reuse the memory resource, resizing it if necessary
+template <typename IO>
+bool TritonData<IO>::updateShm(size_t size, bool canThrow) {
+  bool sizeIncreased = false;
+  bool status = true;
+  if(!memResource_) {
+    memResource_ = std::make_shared<TritonShmResource>(shmName_, size, canThrow);
+    sizeIncreased = true;
+  }
+  else {
+    sizeIncreased = size > memResource_->size();
+    if(sizeIncreased)
+      status &= triton_utils::warnOrThrowIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " updateShm(): unable to unregister shared memory region", canThrow);
+    if(size != memResource_->size())
+      status &= memResource_->remap(size, canThrow);
+  }
+
+  //only need to update the server if size increased
+  if(sizeIncreased)
+    status &= triton_utils::warnOrThrowIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, memResource_->size()), name_ + " updateShm(): unable to register shared memory region", canThrow);
+
+  return status;
+}
+
 //io accessors
 template <>
 template <typename DT>
@@ -203,19 +237,19 @@ TritonInputContainer<DT> TritonInputData::allocate(bool reserve) {
   totalByteSize_ = byteSizePerBatch*batchSize_;
   //choose allocator: shared memory or default (heap)
   //shared memory can only be used at this stage if the batch size and shape are set
-  bool concreteShape = batchSize_>0 and !anyNeg(shape_);
-  if (client_->useSharedMemory() and concreteShape and client_->serverType()==TritonServerType::LocalCPU) {
+  concreteShape_ = batchSize_>0 and !anyNeg(shape_);
+  if (client_->useSharedMemory() and concreteShape_ and client_->serverType()==TritonServerType::LocalCPU) {
     edm::LogInfo(client_->fullDebugName()) << name_ << " allocate(): using CPU shared memory";
     //allocated bytes include space for vector overhead
-    memResource_ = std::make_shared<TritonShmResource>(shmName_, (batchSize_)*sizeof(std::pmr::vector<DT>) + totalByteSize_);
+    updateShm((batchSize_)*sizeof(std::pmr::vector<DT>) + totalByteSize_, true);
     //prevent changing batch size or shape
     lockShape_ = true;
     client_->lockBatch();
   }
   //automatically creates a vector for each batch entry (if batch size known)
-  auto ptr = std::make_shared<TritonInput<DT>>(batchSize_, memResource_ ? memResource_.get() : std::pmr::get_default_resource());
+  auto ptr = std::make_shared<TritonInput<DT>>(batchSize_, (concreteShape_ and memResource_) ? memResource_.get() : std::pmr::get_default_resource());
   //can only reserve if batch size and shape are set
-  if(reserve and concreteShape){
+  if(reserve and concreteShape_){
     for(auto& vec: *ptr){
       vec.reserve(size);
     }
@@ -248,9 +282,9 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     totalByteSize_ = byteSizePerBatch*batchSize_;
     size_t offset = 0;
     //check if more-efficient shm approach could not be used
-    if(!memResource_) {
+    if(!concreteShape_) {
       edm::LogInfo(client_->fullDebugName()) << name_ << " toServer(): using CPU shared memory";
-      memResource_ = std::make_shared<TritonShmResource>(shmName_, totalByteSize_);
+      updateShm(totalByteSize_, true);
       //copy into shared memory region
       for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
         std::memcpy(memResource_->addr() + i0*byteSizePerBatch, data_in[i0].data(), byteSizePerBatch);
@@ -260,7 +294,6 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
       //offset calculated to exclude vector overhead at beginning of shm region
       offset = ((uint8_t*)data_in[0].data() - memResource_->addr());
     }
-    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, memResource_->size()), name_ + " toServer(): unable to register shared memory region");
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, offset), name_ + " toServer(): unable to set shared memory");
   }
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
@@ -288,8 +321,7 @@ bool TritonOutputData::prepare() {
   totalByteSize_ = byteSize_*nOutput*batchSize_;
   if (client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " prepare(): using CPU shared memory";
-    memResource_ = std::make_shared<TritonShmResource>(shmName_, totalByteSize_);
-    status &= triton_utils::warnIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " prepare(): unable to register shared memory region");
+    status &= updateShm(totalByteSize_, false);
     status &= triton_utils::warnIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " prepare(): unable to set shared memory");
   }
   else if (client_->serverType()==TritonServerType::LocalGPU) {
@@ -345,9 +377,7 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
 template <>
 void TritonInputData::reset() {
   holder_.reset();
-  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalCPU)
-    resetShm();
-  else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
+  if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {
     //todo
   }
   data_->Reset();
@@ -360,24 +390,18 @@ void TritonInputData::reset() {
     }
   }
   lockShape_ = false;
+  concreteShape_ = false;
+  totalByteSize_ = 0;
 }
 
 template <>
 void TritonOutputData::reset() {
   if (client_->useSharedMemory() and !variableDims_){
-    if (client_->serverType()==TritonServerType::LocalCPU)
-      resetShm();
-    else if (client_->serverType()==TritonServerType::LocalGPU) {
+    if (client_->serverType()==TritonServerType::LocalGPU) {
       //todo
     }
   }
   result_.reset();
-}
-
-template <typename IO>
-void TritonData<IO>::resetShm() {
-  triton_utils::throwIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " reset(): unable to unregister shared memory region");
-  memResource_.reset();
   totalByteSize_ = 0;
 }
 

@@ -10,12 +10,14 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cmath>
+#include <random>
 
 class TritonImageProducer : public TritonEDProducer<> {
 public:
   explicit TritonImageProducer(edm::ParameterSet const& cfg)
       : TritonEDProducer<>(cfg, "TritonImageProducer"),
-        batchSize_(cfg.getParameter<unsigned>("batchSize")),
+        batchSize_(cfg.getParameter<int>("batchSize")),
         topN_(cfg.getParameter<unsigned>("topN")) {
     //load score list
     std::string imageListFile(cfg.getParameter<edm::FileInPath>("imageList").fullPath());
@@ -30,7 +32,20 @@ public:
     }
   }
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
-    client_->setBatchSize(batchSize_);
+    int actualBatchSize = batchSize_;
+    //negative batch = generate random batch size from 1 to abs(batch)
+    if(batchSize_<0){
+      //get event-based seed for RNG
+      unsigned int runNum_uint = static_cast<unsigned int>(iEvent.id().run());
+      unsigned int lumiNum_uint = static_cast<unsigned int>(iEvent.id().luminosityBlock());
+      unsigned int evNum_uint = static_cast<unsigned int>(iEvent.id().event());
+      std::uint32_t seed = (lumiNum_uint << 10) + (runNum_uint << 20) + evNum_uint;
+      std::mt19937 rng(seed);
+      std::uniform_int_distribution<int> randint(1, std::abs(batchSize_));
+      actualBatchSize = randint(rng);
+    }
+
+    client_->setBatchSize(actualBatchSize);
     // create an npix x npix x ncol image w/ arbitrary color value
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
@@ -50,7 +65,7 @@ public:
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
     edm::ParameterSetDescription desc;
     TritonClient::fillPSetDescription(desc);
-    desc.add<unsigned>("batchSize", 1);
+    desc.add<int>("batchSize", 1);
     desc.add<unsigned>("topN", 5);
     desc.add<edm::FileInPath>("imageList");
     //to ensure distinct cfi names
@@ -81,7 +96,7 @@ private:
     }
   }
 
-  unsigned batchSize_;
+  int batchSize_;
   unsigned topN_;
   std::vector<std::string> imageList_;
 };

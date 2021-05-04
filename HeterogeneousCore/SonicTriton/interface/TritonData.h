@@ -32,11 +32,12 @@ using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
 //helper class for shared memory
 class TritonShmResource : public std::pmr::memory_resource {
 public:
-  TritonShmResource(std::string name, size_t size);
+  TritonShmResource(std::string name, size_t size, bool canThrow);
   virtual ~TritonShmResource();
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
-  void close();
+  bool remap(size_t newSize, bool canThrow);
+  void close(bool canThrow);
 private:
   //required interface
   void* do_allocate(std::size_t bytes, std::size_t alignment) override;
@@ -60,6 +61,9 @@ public:
 
   //constructor
   TritonData(const std::string& name, const TensorMetadata& model_info, TritonClient* client, const std::string& pid);
+
+  //destructor
+  ~TritonData();
 
   //some members can be modified
   bool setShape(const ShapeType& newShape) { checkLockShape(); return setShape(newShape, true); }
@@ -98,6 +102,7 @@ private:
   void reset();
   void setResult(std::shared_ptr<Result> result) { result_ = result; }
   IO* data() { return data_.get(); }
+  bool updateShm(size_t size, bool can_throw);
 
   //helpers
   bool anyNeg(const ShapeView& vec) const {
@@ -113,7 +118,6 @@ private:
     return ++uid;
   }
   std::string xput() const;
-  void resetShm();
 
   //members
   std::string name_;
@@ -126,6 +130,7 @@ private:
   ShapeType fullShape_;
   ShapeView shape_;
   bool lockShape_;
+  bool concreteShape_;
   bool variableDims_;
   int64_t productDims_;
   std::string dname_;

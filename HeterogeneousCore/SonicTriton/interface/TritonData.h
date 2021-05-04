@@ -35,6 +35,7 @@ public:
   TritonShmResource(std::string name, size_t size);
   virtual ~TritonShmResource();
   uint8_t* addr() { return addr_; }
+  size_t size() const { return size_; }
   void close();
 private:
   //required interface

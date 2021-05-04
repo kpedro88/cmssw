@@ -260,7 +260,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
       //offset calculated to exclude vector overhead at beginning of shm region
       offset = ((uint8_t*)data_in[0].data() - memResource_->addr());
     }
-    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, totalByteSize_), name_ + " toServer(): unable to register shared memory region");
+    triton_utils::throwIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, memResource_->size()), name_ + " toServer(): unable to register shared memory region");
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, offset), name_ + " toServer(): unable to set shared memory");
   }
   else if (client_->useSharedMemory() and client_->serverType()==TritonServerType::LocalGPU) {

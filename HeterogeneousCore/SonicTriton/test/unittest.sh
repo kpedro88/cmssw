@@ -42,7 +42,7 @@ if [ -n "$SINGULARITY_CONTAINER" ]; then
 fi
 
 tmpFile=$(mktemp -p ${LOCALTOP} SonicTritonTestXXXXXXXX.log)
-cmsRun ${LOCALTOP}/src/HeterogeneousCore/SonicTriton/test/tritonTest_cfg.py modules=TritonGraphProducer,TritonGraphFilter,TritonGraphAnalyzer maxEvents=2 unittest=1 verbose=1 device=${DEVICE} >& $tmpFile
+cmsRun ${LOCALTOP}/src/HeterogeneousCore/SonicTriton/test/tritonTest_cfg.py modules=TritonGraphProducer,TritonGraphFilter,TritonGraphAnalyzer maxEvents=2 unittest=1 verbose=1 device=${DEVICE} testother=1 >& $tmpFile
 CMSEXIT=$?
 
 cat $tmpFile

@@ -16,6 +16,7 @@ options.register("mode","Async", VarParsing.multiplicity.singleton, VarParsing.v
 options.register("verbose", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("brief", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("unittest", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
+options.register("testother", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("device","auto", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("docker", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("tries", 0, VarParsing.multiplicity.singleton, VarParsing.varType.int)
@@ -114,7 +115,7 @@ for module in options.modules:
         processModule.brief = cms.bool(options.brief)
     process.p += processModule
     keepMsgs.extend([module,module+':TritonClient'])
-    if options.unittest:
+    if options.testother:
         # clone modules to test both gRPC and shared memory
         _module2 = module+"GRPC" if processModule.Client.useSharedMemory else "SHM"
         setattr(process, _module2,

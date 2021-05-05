@@ -36,8 +36,7 @@ public:
   virtual ~TritonShmResource();
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
-  bool remap(size_t newSize, bool canThrow);
-  void close(bool canThrow);
+  bool close(bool canThrow);
 private:
   //required interface
   void* do_allocate(std::size_t bytes, std::size_t alignment) override;

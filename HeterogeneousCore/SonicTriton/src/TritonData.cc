@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <cerrno>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
@@ -51,26 +50,22 @@ TritonShmResource::TritonShmResource(std::string name, size_t size, bool canThro
     triton_utils::warnOrThrow("unable to close descriptor for shared memory key: " + name_, canThrow);
 }
 
-bool TritonShmResource::remap(size_t newSize, bool canThrow) {
-  void* new_addr = mremap(addr_, size_, newSize, MREMAP_MAYMOVE);
-  if(new_addr == (void*)-1){
-    triton_utils::warnOrThrow("unable to remap shared memory key " + name_ + " from " + std::to_string(size_) + " to " + std::to_string(newSize) + " bytes (errno "+std::to_string(errno)+")", canThrow);
-    return false;
-  }
-  addr_ = (uint8_t*)new_addr;
-  return true;
-}
-
-void TritonShmResource::close(bool canThrow) {
+bool TritonShmResource::close(bool canThrow) {
   //unmap
   int tmp_fd = munmap(addr_, size_);
-  if (tmp_fd == -1)
+  if (tmp_fd == -1){
     triton_utils::warnOrThrow("unable to munmap for shared memory key: " + name_, canThrow);
+    return false;
+  }
 
   //unlink
   int shm_fd = shm_unlink(name_.c_str());
-  if (shm_fd == -1)
+  if (shm_fd == -1){
     triton_utils::warnOrThrow("unable to unlink for shared memory key: " + name_, canThrow);
+    return false;
+  }
+
+  return true;
 }
 
 TritonShmResource::~TritonShmResource() {
@@ -78,11 +73,6 @@ TritonShmResource::~TritonShmResource() {
   close(false);
 }
 
-//todo: make this resizeable with mremap
-//requires a better shm interface from Triton: need to be able to specify non-contiguous chunks
-//currently, all inner vectors, including overhead, are in one contiguous chunk
-//this assumes all push_back() calls are in order, which might not be true for resizeable usage
-//each inner vector should have its own shm chunk in resizeable case (overhead on heap)
 void* TritonShmResource::do_allocate(std::size_t bytes, std::size_t alignment) {
   size_t old_counter = counter_;
   counter_ += bytes;
@@ -207,23 +197,17 @@ void TritonData<IO>::setBatchSize(unsigned bsize) {
 //otherwise, reuse the memory resource, resizing it if necessary
 template <typename IO>
 bool TritonData<IO>::updateShm(size_t size, bool canThrow) {
-  bool sizeIncreased = false;
+  bool sizeIncreased = !memResource_ or size > memResource_->size();
   bool status = true;
-  if(!memResource_) {
-    memResource_ = std::make_shared<TritonShmResource>(shmName_, size, canThrow);
-    sizeIncreased = true;
-  }
-  else {
-    sizeIncreased = size > memResource_->size();
-    if(sizeIncreased)
+  if(sizeIncreased) {
+    if(memResource_) {
       status &= triton_utils::warnOrThrowIfError(client_->client()->UnregisterSystemSharedMemory(shmName_), name_ + " updateShm(): unable to unregister shared memory region", canThrow);
-    if(size != memResource_->size())
-      status &= memResource_->remap(size, canThrow);
-  }
-
-  //only need to update the server if size increased
-  if(sizeIncreased)
+//      status &= memResource_->close(canThrow);
+      memResource_.reset();
+    }
+    memResource_ = std::make_shared<TritonShmResource>(shmName_, size, canThrow);
     status &= triton_utils::warnOrThrowIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, memResource_->size()), name_ + " updateShm(): unable to register shared memory region", canThrow);
+  }
 
   return status;
 }

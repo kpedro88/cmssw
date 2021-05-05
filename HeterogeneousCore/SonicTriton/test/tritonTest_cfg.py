@@ -114,6 +114,16 @@ for module in options.modules:
         processModule.brief = cms.bool(options.brief)
     process.p += processModule
     keepMsgs.extend([module,module+':TritonClient'])
+    if options.unittest:
+        # clone modules to test both gRPC and shared memory
+        _module2 = module+"GRPC" if processModule.Client.useSharedMemory else "SHM"
+        setattr(process, _module2,
+            processModule.clone(
+                Client = dict(useSharedMemory = not processModule.Client.useSharedMemory)
+            )
+        )
+        processModule2 = getattr(process, _module2)
+        process.p += processModule2
 
 process.load('FWCore/MessageService/MessageLogger_cfi')
 process.MessageLogger.cerr.FwkReport.reportEvery = 500

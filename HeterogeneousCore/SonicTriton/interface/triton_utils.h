@@ -8,7 +8,10 @@
 #include <vector>
 #include <unordered_set>
 
+#define TRITON_ENABLE_GPU
 #include "grpc_client.h"
+
+#include "cuda_runtime_api.h"
 
 namespace triton_utils {
 
@@ -28,6 +31,8 @@ namespace triton_utils {
 
   //generic version w/o Error
   void warnOrThrow(std::string_view msg, bool canThrow);
+
+  bool cudaCheck(cudaError_t result, std::string_view msg, bool canThrow);
 
 }  // namespace triton_utils
 

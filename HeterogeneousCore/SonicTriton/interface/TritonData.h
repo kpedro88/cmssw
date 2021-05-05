@@ -13,11 +13,15 @@
 #include <atomic>
 #include <memory_resource>
 
+//prevent triton ipc.h from conflicting w/ cuda
+#define TRITON_ENABLE_GPU
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
 
 //forward declaration
 class TritonClient;
+struct cudaIpcMemHandle_st;
+typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
 
 //aliases for local input and output types
 template <typename DT>
@@ -32,7 +36,7 @@ using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
 //helper class for shared memory
 class TritonShmResource : public std::pmr::memory_resource {
 public:
-  TritonShmResource(std::string name, size_t size, bool canThrow);
+  TritonShmResource(const std::string& name, size_t size, bool canThrow);
   virtual ~TritonShmResource();
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
@@ -47,6 +51,25 @@ private:
   size_t size_;
   size_t counter_;
   uint8_t* addr_;
+};
+
+//helper class for gpu (cuda) shared memory
+class TritonCudaShmResource {
+public:
+  TritonCudaShmResource(const std::string& name, size_t size, bool canThrow);
+  virtual ~TritonCudaShmResource();
+  uint8_t* addr() { return addr_; }
+  size_t size() const { return size_; }
+  int deviceId() const { return deviceId_; }
+  const cudaIpcMemHandle_t* handle() const { return handle_; }
+  bool close(bool canThrow);
+private:
+  //member variables
+  std::string name_;
+  size_t size_;
+  int deviceId_;
+  uint8_t* addr_;
+  cudaIpcMemHandle_t* handle_;
 };
 
 //store all the info needed for triton input and output
@@ -102,6 +125,7 @@ private:
   void setResult(std::shared_ptr<Result> result) { result_ = result; }
   IO* data() { return data_.get(); }
   bool updateShm(size_t size, bool can_throw);
+  bool updateCudaShm(size_t size, bool can_throw);
 
   //helpers
   bool anyNeg(const ShapeView& vec) const {
@@ -138,6 +162,7 @@ private:
   size_t totalByteSize_;
   std::shared_ptr<void> holder_;
   std::shared_ptr<TritonShmResource> memResource_;
+  std::shared_ptr<TritonCudaShmResource> cudaResource_;
   std::shared_ptr<Result> result_;
 };
 

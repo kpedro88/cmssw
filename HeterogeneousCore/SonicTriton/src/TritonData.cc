@@ -104,11 +104,11 @@ namespace {
 
 //cuda shared memory helper
 //based on https://github.com/triton-inference-server/server/blob/v2.3.0/src/clients/c++/examples/simple_grpc_cudashm_client.cc
-TritonCudaShmResource::TritonCudaShmResource(const std::string& name, size_t size, bool canThrow) : name_(name), size_(size), deviceId_(0), addr_(nullptr), handle_(nullptr) {
+TritonCudaShmResource::TritonCudaShmResource(const std::string& name, size_t size, bool canThrow) : name_(name), size_(size), deviceId_(0), addr_(nullptr), handle_(std::make_shared<cudaIpcMemHandle_t>()) {
   triton_utils::cudaCheck(cudaMalloc((void**)&addr_, size_), "unable to allocate GPU memory for key: "+name_, canThrow);
   //todo: get server device id somehow?
   triton_utils::cudaCheck(cudaSetDevice(deviceId_), "unable to set device ID to "+std::to_string(deviceId_), canThrow);
-  triton_utils::cudaCheck(cudaIpcGetMemHandle(handle_, addr_), "unable to get IPC handle for key: "+name_+"("+ptr_string((void*)addr_)+")", canThrow);
+  triton_utils::cudaCheck(cudaIpcGetMemHandle(handle_.get(), addr_), "unable to get IPC handle for key: "+name_+"("+ptr_string((void*)addr_)+")", canThrow);
 }
 
 TritonCudaShmResource::~TritonCudaShmResource() {
@@ -334,7 +334,7 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
     //copy into shared memory region
     for (unsigned i0 = 0; i0 < batchSize_; ++i0) {
       void* thisAddr(cudaResource_->addr() + i0*byteSizePerBatch);
-      triton_utils::cudaCheck(cudaMemcpy((void*)(thisAddr), (void*)(data_in[i0].data()), byteSizePerBatch, cudaMemcpyHostToDevice), "unable to memcpy "+std::to_string(byteSizePerBatch)+" bytes to GPU ("+ptr_string(thisAddr)+")", true);
+      triton_utils::cudaCheck(cudaMemcpy((void*)(thisAddr), (void*)(data_in[i0].data()), byteSizePerBatch, cudaMemcpyHostToDevice), name_ + " toServer(): unable to memcpy "+std::to_string(byteSizePerBatch)+" bytes to GPU ("+ptr_string(thisAddr)+")", true);
     }
     triton_utils::throwIfError(data_->SetSharedMemory(shmName_, totalByteSize_, 0), name_ + " toServer(): unable to set shared memory");
   }
@@ -352,12 +352,12 @@ void TritonInputData::toServer(TritonInputContainer<DT> ptr) {
 //sets up shared memory for outputs, if possible
 template <>
 bool TritonOutputData::prepare() {
+  uint64_t nOutput = sizeShape();
+  totalByteSize_ = byteSize_*nOutput*batchSize_;
   //can't use shared memory if output size is not known
   if (!client_->useSharedMemory() or variableDims_ or client_->serverType()==TritonServerType::Remote) return true;
 
   bool status = true;
-  uint64_t nOutput = sizeShape();
-  totalByteSize_ = byteSize_*nOutput*batchSize_;
   if (client_->serverType()==TritonServerType::LocalCPU) {
     LogDebug(client_->fullDebugName()) << name_ << " prepare(): using CPU shared memory";
     status &= updateShm(totalByteSize_, false);
@@ -394,16 +394,18 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
   }
   else if (canUseShm and client_->serverType()==TritonServerType::LocalGPU) {
     LogDebug(client_->fullDebugName()) << name_ << " fromServer(): using GPU shared memory";
-    //outputs already loaded into ptr
-    r0 = cudaResource_->addr();
+    //copy back from gpu, keep in scope
+    auto ptr = std::make_shared<std::vector<uint8_t>>(totalByteSize_);
+    triton_utils::cudaCheck(cudaMemcpy((void*)(ptr->data()), (void*)(cudaResource_->addr()), totalByteSize_, cudaMemcpyDeviceToHost), name_ + " fromServer(): unable to memcpy "+std::to_string(totalByteSize_)+" bytes from GPU ("+ptr_string(cudaResource_->addr())+")", true);
+    r0 = ptr->data();
+    holder_ = ptr;
   }
   else {
     size_t contentByteSize;
-    size_t expectedContentByteSize = nOutput * byteSize_ * batchSize_;
     triton_utils::throwIfError(result_->RawData(name_, &r0, &contentByteSize), name_ + " fromServer(): unable to get raw");
-    if (contentByteSize != expectedContentByteSize) {
+    if (contentByteSize != totalByteSize_) {
       throw cms::Exception("TritonDataError") << name_ << " fromServer(): unexpected content byte size " << contentByteSize
-                                              << " (expected " << expectedContentByteSize << ")";
+                                              << " (expected " << totalByteSize_ << ")";
     }
   }
 
@@ -437,6 +439,7 @@ void TritonInputData::reset() {
 template <>
 void TritonOutputData::reset() {
   result_.reset();
+  holder_.reset();
   totalByteSize_ = 0;
 }
 

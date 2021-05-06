@@ -61,7 +61,7 @@ public:
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
   int deviceId() const { return deviceId_; }
-  const cudaIpcMemHandle_t* handle() const { return handle_; }
+  const cudaIpcMemHandle_t* handle() const { return handle_.get(); }
   bool close(bool canThrow);
 private:
   //member variables
@@ -69,7 +69,7 @@ private:
   size_t size_;
   int deviceId_;
   uint8_t* addr_;
-  cudaIpcMemHandle_t* handle_;
+  std::shared_ptr<cudaIpcMemHandle_t> handle_;
 };
 
 //store all the info needed for triton input and output
@@ -160,7 +160,7 @@ private:
   inference::DataType dtype_;
   int64_t byteSize_;
   size_t totalByteSize_;
-  std::shared_ptr<void> holder_;
+  mutable std::shared_ptr<void> holder_;
   std::shared_ptr<TritonShmResource> memResource_;
   std::shared_ptr<TritonCudaShmResource> cudaResource_;
   std::shared_ptr<Result> result_;

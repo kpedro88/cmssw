@@ -17,6 +17,7 @@ options.register("verbose", False, VarParsing.multiplicity.singleton, VarParsing
 options.register("brief", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("unittest", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("testother", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
+options.register("shm", True, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("device","auto", VarParsing.multiplicity.singleton, VarParsing.varType.string)
 options.register("docker", False, VarParsing.multiplicity.singleton, VarParsing.varType.bool)
 options.register("tries", 0, VarParsing.multiplicity.singleton, VarParsing.varType.int)
@@ -91,7 +92,7 @@ for module in options.modules:
                 modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/{}/config.pbtxt".format(models[module])),
                 verbose = cms.untracked.bool(options.verbose),
                 allowedTries = cms.untracked.uint32(options.tries),
-                useSharedMemory = cms.untracked.bool(True),
+                useSharedMemory = cms.untracked.bool(options.shm),
             )
         )
     )

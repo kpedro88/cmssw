@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <memory>
 #include <atomic>
-#include <memory_resource>
 
 //prevent triton ipc.h from conflicting w/ cuda
 #define TRITON_ENABLE_GPU
@@ -25,7 +24,7 @@ typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
 
 //aliases for local input and output types
 template <typename DT>
-using TritonInput = std::pmr::vector<std::pmr::vector<DT>>;
+using TritonInput = std::vector<std::vector<DT>>;
 template <typename DT>
 using TritonOutput = std::vector<edm::Span<const DT*>>;
 
@@ -33,31 +32,13 @@ using TritonOutput = std::vector<edm::Span<const DT*>>;
 template <typename DT>
 using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
 
-//helper class for shared memory
-class TritonShmResource : public std::pmr::memory_resource {
+//helper class for shared memory (cpu or gpu)
+//originally an actual std::memory_resource,
+//but allocating directly into shm was found not to be significantly faster than just memcpy
+class TritonShmResource {
 public:
-  TritonShmResource(const std::string& name, size_t size, bool canThrow);
+  TritonShmResource(bool cpu, const std::string& name, size_t size, bool canThrow);
   virtual ~TritonShmResource();
-  uint8_t* addr() { return addr_; }
-  size_t size() const { return size_; }
-  bool close(bool canThrow);
-private:
-  //required interface
-  void* do_allocate(std::size_t bytes, std::size_t alignment) override;
-  void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override;
-  bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override;
-  //member variables
-  std::string name_;
-  size_t size_;
-  size_t counter_;
-  uint8_t* addr_;
-};
-
-//helper class for gpu (cuda) shared memory
-class TritonCudaShmResource {
-public:
-  TritonCudaShmResource(const std::string& name, size_t size, bool canThrow);
-  virtual ~TritonCudaShmResource();
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
   int deviceId() const { return deviceId_; }
@@ -65,10 +46,11 @@ public:
   bool close(bool canThrow);
 private:
   //member variables
+  bool cpu_;
   std::string name_;
   size_t size_;
-  int deviceId_;
   uint8_t* addr_;
+  int deviceId_;
   std::shared_ptr<cudaIpcMemHandle_t> handle_;
 };
 
@@ -88,8 +70,8 @@ public:
   ~TritonData();
 
   //some members can be modified
-  bool setShape(const ShapeType& newShape) { checkLockShape(); return setShape(newShape, true); }
-  bool setShape(unsigned loc, int64_t val) { checkLockShape(); return setShape(loc, val, true); }
+  bool setShape(const ShapeType& newShape) { return setShape(newShape, true); }
+  bool setShape(unsigned loc, int64_t val) { return setShape(loc, val, true); }
 
   //io accessors
   template <typename DT>
@@ -117,7 +99,6 @@ private:
 
   //private accessors only used internally or by client
   unsigned fullLoc(unsigned loc) const { return loc + (noBatch_ ? 0 : 1); }
-  void checkLockShape() const;
   bool setShape(const ShapeType& newShape, bool canThrow);
   bool setShape(unsigned loc, int64_t val, bool canThrow);
   void setBatchSize(unsigned bsize);
@@ -125,7 +106,8 @@ private:
   void setResult(std::shared_ptr<Result> result) { result_ = result; }
   IO* data() { return data_.get(); }
   bool updateShm(size_t size, bool can_throw);
-  bool updateCudaShm(size_t size, bool can_throw);
+  void computeSizes();
+  void resetSizes();
 
   //helpers
   bool anyNeg(const ShapeView& vec) const {
@@ -134,7 +116,7 @@ private:
   int64_t dimProduct(const ShapeView& vec) const {
     return std::accumulate(vec.begin(), vec.end(), 1, std::multiplies<int64_t>());
   }
-  void createObject(IO** ioptr) const;
+  void createObject(IO** ioptr);
   //generates a unique id number for each instance of the class
   unsigned uid() const {
     static std::atomic<unsigned> uid{0};
@@ -146,23 +128,24 @@ private:
   std::string name_;
   std::shared_ptr<IO> data_;
   TritonClient* client_;
+  bool useShm_;
   std::string shmName_;
+  bool cpu_;
   const ShapeType dims_;
   bool noBatch_;
   unsigned batchSize_;
   ShapeType fullShape_;
   ShapeView shape_;
-  bool lockShape_;
-  bool concreteShape_;
   bool variableDims_;
   int64_t productDims_;
   std::string dname_;
   inference::DataType dtype_;
   int64_t byteSize_;
+  size_t sizeShape_;
+  size_t byteSizePerBatch_;
   size_t totalByteSize_;
   mutable std::shared_ptr<void> holder_;
   std::shared_ptr<TritonShmResource> memResource_;
-  std::shared_ptr<TritonCudaShmResource> cudaResource_;
   std::shared_ptr<Result> result_;
 };
 
@@ -192,9 +175,9 @@ void TritonInputData::reset();
 template <>
 void TritonOutputData::reset();
 template <>
-void TritonInputData::createObject(nvidia::inferenceserver::client::InferInput** ioptr) const;
+void TritonInputData::createObject(nvidia::inferenceserver::client::InferInput** ioptr);
 template <>
-void TritonOutputData::createObject(nvidia::inferenceserver::client::InferRequestedOutput** ioptr) const;
+void TritonOutputData::createObject(nvidia::inferenceserver::client::InferRequestedOutput** ioptr);
 
 //explicit template instantiation declarations
 extern template class TritonData<nvidia::inferenceserver::client::InferInput>;

@@ -12,7 +12,6 @@
 #include <memory>
 #include <atomic>
 
-//prevent triton ipc.h from conflicting w/ cuda
 #define TRITON_ENABLE_GPU
 #include "grpc_client.h"
 #include "grpc_service.pb.h"

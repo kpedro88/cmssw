@@ -13,31 +13,13 @@
 #include <exception>
 #include <unordered_map>
 
+#define TRITON_ENABLE_GPU
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
 
 //forward declaration
 struct cudaIpcMemHandle_st;
 typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
-
-//workaround lack of TRITON_ENABLE_GPU
-class InferenceServerGrpcClient : public nvidia::inferenceserver::client::InferenceServerClient {
-public:
-  nvidia::inferenceserver::client::Error RegisterCudaSharedMemory(const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle, const size_t device_id, const size_t byte_size, const nvidia::inferenceserver::client::Headers& headers = nvidia::inferenceserver::client::Headers());
-protected:
-  grpc::CompletionQueue async_request_completion_queue_;
-  InferenceServerClient::OnCompleteFn stream_callback_;
-  std::thread stream_worker_;
-  std::shared_ptr<grpc::ClientReaderWriter<
-      inference::ModelInferRequest, inference::ModelStreamInferResponse>>
-      grpc_stream_;
-  grpc::ClientContext grpc_context_;
-  bool enable_stream_stats_;
-  std::queue<std::unique_ptr<nvidia::inferenceserver::client::RequestTimers>> ongoing_stream_request_timers_;
-  std::mutex stream_mutex_;
-  std::unique_ptr<inference::GRPCInferenceService::Stub> stub_;
-  inference::ModelInferRequest infer_request_;
-};
 
 class TritonClient : public SonicClient<TritonInputMap, TritonOutputMap> {
 public:
@@ -102,7 +84,6 @@ private:
 
   //private accessors only used by data
   auto client() { return client_.get(); }
-  auto clientCuda() { return reinterpret_cast<InferenceServerGrpcClient*>(client_.get()); }
 };
 
 #endif

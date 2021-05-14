@@ -22,37 +22,6 @@
 namespace ni = nvidia::inferenceserver;
 namespace nic = ni::client;
 
-//workaround lack of TRITON_ENABLE_GPU
-nic::Error InferenceServerGrpcClient::RegisterCudaSharedMemory(const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle, const size_t device_id, const size_t byte_size, const nic::Headers& headers) {
-  nic::Error err;
-
-  inference::CudaSharedMemoryRegisterRequest request;
-  inference::CudaSharedMemoryRegisterResponse response;
-  grpc::ClientContext context;
-
-  for (const auto& it : headers) {
-    context.AddMetadata(it.first, it.second);
-  }
-
-  request.set_name(name);
-  request.set_raw_handle((char*)&cuda_shm_handle, sizeof(cudaIpcMemHandle_t));
-  request.set_device_id(device_id);
-  request.set_byte_size(byte_size);
-  grpc::Status grpc_status =
-      stub_->CudaSharedMemoryRegister(&context, request, &response);
-  if (!grpc_status.ok()) {
-    err = nic::Error(grpc_status.error_message());
-  } else {
-    if (verbose_) {
-      std::cout << "Registered cuda shared memory with name  '" << name << "'"
-                << std::endl;
-    }
-  }
-
-  return err;
-}
-
-
 //based on https://github.com/triton-inference-server/server/blob/v2.3.0/src/clients/c++/examples/simple_grpc_async_infer_client.cc
 //and https://github.com/triton-inference-server/server/blob/v2.3.0/src/clients/c++/perf_client/perf_client.cc
 

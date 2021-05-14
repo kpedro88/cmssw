@@ -215,7 +215,7 @@ bool TritonData<IO>::updateShm(size_t size, bool canThrow) {
     if(cpu_)
       status &= triton_utils::warnOrThrowIfError(client_->client()->RegisterSystemSharedMemory(shmName_, shmName_, memResource_->size()), name_ + " updateShm(): unable to register shared memory region", canThrow);
     else
-      status &= triton_utils::warnOrThrowIfError(client_->clientCuda()->RegisterCudaSharedMemory(shmName_, *(memResource_->handle()), memResource_->deviceId(), memResource_->size()), name_ + " updateShm(): unable to register CUDA shared memory region", canThrow);
+      status &= triton_utils::warnOrThrowIfError(client_->client()->RegisterCudaSharedMemory(shmName_, *(memResource_->handle()), memResource_->deviceId(), memResource_->size()), name_ + " updateShm(): unable to register CUDA shared memory region", canThrow);
   }
 
   return status;

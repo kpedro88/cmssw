@@ -34,7 +34,7 @@ public:
   void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
     int actualBatchSize = batchSize_;
     //negative batch = generate random batch size from 1 to abs(batch)
-    if(batchSize_<0){
+    if (batchSize_ < 0) {
       //get event-based seed for RNG
       unsigned int runNum_uint = static_cast<unsigned int>(iEvent.id().run());
       unsigned int lumiNum_uint = static_cast<unsigned int>(iEvent.id().luminosityBlock());
@@ -50,7 +50,7 @@ public:
     // model only has one input, so just pick begin()
     auto& input1 = iInput.begin()->second;
     auto data1 = input1.allocate<float>();
-    for (auto& vdata1: *data1){
+    for (auto& vdata1 : *data1) {
       vdata1.assign(input1.sizeDims(), 0.5f);
     }
     // convert to server format

@@ -30,7 +30,8 @@ namespace triton_utils {
   }
 
   bool warnOrThrowIfError(const Error& err, std::string_view msg, bool canThrow) {
-    if(canThrow) throwIfError(err, msg);
+    if (canThrow)
+      throwIfError(err, msg);
     return !canThrow ? warnIfError(err, msg) : err.IsOk();
   }
 
@@ -42,7 +43,7 @@ namespace triton_utils {
     if (LIKELY(result == cudaSuccess))
       return true;
 
-    std::string cudaMsg(std::string(cudaGetErrorName(result))+": "+cudaGetErrorString(result));
+    std::string cudaMsg(std::string(cudaGetErrorName(result)) + ": " + cudaGetErrorString(result));
     warnOrThrowIfError(Error(cudaMsg), msg, canThrow);
     return false;
   }

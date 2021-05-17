@@ -81,7 +81,8 @@ public:
 
   //accessors
   void addModel(const std::string& modelName, const std::string& path);
-  std::pair<std::string, TritonServerType> serverAddress(const std::string& model, const std::string& preferred = "") const;
+  std::pair<std::string, TritonServerType> serverAddress(const std::string& model,
+                                                         const std::string& preferred = "") const;
   const std::string& pid() const { return pid_; }
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);

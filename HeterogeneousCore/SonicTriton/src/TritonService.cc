@@ -160,7 +160,7 @@ void TritonService::preModuleDestruction(edm::ModuleDescription const& desc) {
 
 //second return value is only true if fallback CPU server is being used
 std::pair<std::string, TritonServerType> TritonService::serverAddress(const std::string& model,
-                                                          const std::string& preferred) const {
+                                                                      const std::string& preferred) const {
   auto mit = models_.find(model);
   if (mit == models_.end())
     throw cms::Exception("MissingModel") << "There are no servers that provide model " << model;
@@ -179,7 +179,10 @@ std::pair<std::string, TritonServerType> TritonService::serverAddress(const std:
 
   //todo: use some algorithm to select server rather than just picking arbitrarily
   const auto& serverInfo(servers_.find(serverName)->second);
-  return std::make_pair(serverInfo.url, serverInfo.isFallback ? fallbackOpts_.useGPU ? TritonServerType::LocalGPU : TritonServerType::LocalCPU : TritonServerType::Remote);
+  return std::make_pair(serverInfo.url,
+                        serverInfo.isFallback
+                            ? fallbackOpts_.useGPU ? TritonServerType::LocalGPU : TritonServerType::LocalCPU
+                            : TritonServerType::Remote);
 }
 
 void TritonService::preBeginJob(edm::PathsAndConsumesOfModulesBase const&, edm::ProcessContext const&) {

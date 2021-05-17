@@ -42,9 +42,10 @@ public:
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
   bool status() const { return status_; }
-  virtual void copy(const void* values, size_t offset) { }
-  virtual void copy(void** values) { }
+  virtual void copy(const void* values, size_t offset) {}
+  virtual void copy(void** values) {}
   virtual bool set(bool canThrow);
+
 protected:
   //member variables
   TritonData<IO>* data_;
@@ -80,6 +81,7 @@ public:
   ~TritonGpuShmResource() override;
   void copy(const void* values, size_t offset) override {}
   void copy(void** values) override {}
+
 protected:
   int deviceId_;
   std::shared_ptr<cudaIpcMemHandle_t> handle_;
@@ -106,7 +108,7 @@ public:
 
   //io accessors
   template <typename DT>
-  TritonInputContainer<DT> allocate(bool reserve=true);
+  TritonInputContainer<DT> allocate(bool reserve = true);
   template <typename DT>
   void toServer(TritonInputContainer<DT> ptr);
   bool prepare();

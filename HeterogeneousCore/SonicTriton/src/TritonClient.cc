@@ -39,7 +39,7 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
     edm::LogInfo(fullDebugName_) << "Using server: " << url;
   //enforce sync mode for fallback CPU server to avoid contention
   //todo: could enforce async mode otherwise (unless mode was specified by user?)
-  if (serverType_==TritonServerType::LocalCPU)
+  if (serverType_ == TritonServerType::LocalCPU)
     setMode(SonicMode::Sync);
 
   //connect to the server
@@ -99,8 +99,9 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
   inputsTriton_.reserve(nicInputs.size());
   for (const auto& nicInput : nicInputs) {
     const auto& iname = nicInput.name();
-    auto [curr_itr, success] = input_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(iname), std::forward_as_tuple(iname, nicInput, this, ts->pid()));
+    auto [curr_itr, success] = input_.emplace(std::piecewise_construct,
+                                              std::forward_as_tuple(iname),
+                                              std::forward_as_tuple(iname, nicInput, this, ts->pid()));
     auto& curr_input = curr_itr->second;
     inputsTriton_.push_back(curr_input.data());
     if (verbose_) {
@@ -122,8 +123,9 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
     const auto& oname = nicOutput.name();
     if (!s_outputs.empty() and s_outputs.find(oname) == s_outputs.end())
       continue;
-    auto [curr_itr, success] = output_.emplace(
-        std::piecewise_construct, std::forward_as_tuple(oname), std::forward_as_tuple(oname, nicOutput, this, ts->pid()));
+    auto [curr_itr, success] = output_.emplace(std::piecewise_construct,
+                                               std::forward_as_tuple(oname),
+                                               std::forward_as_tuple(oname, nicOutput, this, ts->pid()));
     auto& curr_output = curr_itr->second;
     outputsTriton_.push_back(curr_output.data());
     if (verbose_) {
@@ -160,7 +162,6 @@ TritonClient::~TritonClient() {
   input_.clear();
   output_.clear();
 }
-
 
 bool TritonClient::setBatchSize(unsigned bsize) {
   if (bsize > maxBatchSize_) {
@@ -221,7 +222,8 @@ void TritonClient::evaluate() {
   for (auto& element : output_) {
     prepare_status &= element.second.prepare();
   }
-  if (!prepare_status) finish(prepare_status);
+  if (!prepare_status)
+    finish(prepare_status);
 
   // Get the status of the server prior to the request being made.
   const auto& start_status = getServerSideStatus();

@@ -5,7 +5,6 @@
 
 #include <sstream>
 #include <experimental/iterator>
-#include <memory_resource>
 
 namespace triton_utils {
 

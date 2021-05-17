@@ -37,6 +37,9 @@ public:
   //constructor
   TritonClient(const edm::ParameterSet& params, const std::string& debugName);
 
+  //destructor
+  ~TritonClient();
+
   //accessors
   unsigned batchSize() const { return batchSize_; }
   bool verbose() const { return verbose_; }

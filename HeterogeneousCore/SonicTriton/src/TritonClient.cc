@@ -152,6 +152,16 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
   }
 }
 
+TritonClient::~TritonClient() {
+  //by default: members of this class destroyed before members of base class
+  //in shared memory case, TritonMemResource (member of TritonData) unregisters from client_ in its destructor
+  //but input/output objects are member of base class, so destroyed after client_ (member of this class)
+  //therefore, clear the maps here
+  input_.clear();
+  output_.clear();
+}
+
+
 bool TritonClient::setBatchSize(unsigned bsize) {
   if (bsize > maxBatchSize_) {
     edm::LogWarning(fullDebugName_) << "Requested batch size " << bsize << " exceeds server-specified max batch size "

@@ -17,6 +17,8 @@
 #include "grpc_service.pb.h"
 
 //forward declaration
+template <typename IO>
+class TritonData;
 class TritonClient;
 struct cudaIpcMemHandle_st;
 typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
@@ -31,24 +33,54 @@ using TritonOutput = std::vector<edm::Span<const DT*>>;
 template <typename DT>
 using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
 
-//helper class for shared memory (cpu or gpu)
-//originally an actual std::memory_resource,
-//but allocating directly into shm was found not to be significantly faster than just memcpy
-class TritonShmResource {
+//base class for memory operations
+template <typename IO>
+class TritonMemResource {
 public:
-  TritonShmResource(bool cpu, const std::string& name, size_t size, bool canThrow);
-  virtual ~TritonShmResource();
+  TritonMemResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
+  virtual ~TritonMemResource() {}
   uint8_t* addr() { return addr_; }
   size_t size() const { return size_; }
-  int deviceId() const { return deviceId_; }
-  const cudaIpcMemHandle_t* handle() const { return handle_.get(); }
-  bool close(bool canThrow);
-private:
+  bool status() const { return status_; }
+  virtual void copy(const void* values, size_t offset) { }
+  virtual void copy(void** values) { }
+  virtual bool set(bool canThrow);
+protected:
   //member variables
-  bool cpu_;
+  TritonData<IO>* data_;
   std::string name_;
   size_t size_;
   uint8_t* addr_;
+  bool status_;
+};
+
+template <typename IO>
+class TritonHeapResource : public TritonMemResource<IO> {
+public:
+  TritonHeapResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
+  ~TritonHeapResource() override {}
+  void copy(const void* values, size_t offset) override {}
+  void copy(void** values) override {}
+  bool set(bool canThrow) override { return true; }
+};
+
+template <typename IO>
+class TritonCpuShmResource : public TritonMemResource<IO> {
+public:
+  TritonCpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
+  ~TritonCpuShmResource() override;
+  void copy(const void* values, size_t offset) override {}
+  void copy(void** values) override {}
+};
+
+template <typename IO>
+class TritonGpuShmResource : public TritonMemResource<IO> {
+public:
+  TritonGpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
+  ~TritonGpuShmResource() override;
+  void copy(const void* values, size_t offset) override {}
+  void copy(void** values) override {}
+protected:
   int deviceId_;
   std::shared_ptr<cudaIpcMemHandle_t> handle_;
 };
@@ -95,6 +127,10 @@ public:
 
 private:
   friend class TritonClient;
+  friend class TritonMemResource<IO>;
+  friend class TritonHeapResource<IO>;
+  friend class TritonCpuShmResource<IO>;
+  friend class TritonGpuShmResource<IO>;
 
   //private accessors only used internally or by client
   unsigned fullLoc(unsigned loc) const { return loc + (noBatch_ ? 0 : 1); }
@@ -104,9 +140,10 @@ private:
   void reset();
   void setResult(std::shared_ptr<Result> result) { result_ = result; }
   IO* data() { return data_.get(); }
-  bool updateShm(size_t size, bool can_throw);
+  bool updateMem(size_t size, bool can_throw);
   void computeSizes();
   void resetSizes();
+  auto client();
 
   //helpers
   bool anyNeg(const ShapeView& vec) const {
@@ -129,7 +166,6 @@ private:
   TritonClient* client_;
   bool useShm_;
   std::string shmName_;
-  bool cpu_;
   const ShapeType dims_;
   bool noBatch_;
   unsigned batchSize_;
@@ -144,16 +180,34 @@ private:
   size_t byteSizePerBatch_;
   size_t totalByteSize_;
   mutable std::shared_ptr<void> holder_;
-  std::shared_ptr<TritonShmResource> memResource_;
+  std::shared_ptr<TritonMemResource<IO>> memResource_;
   std::shared_ptr<Result> result_;
 };
 
+using TritonInputHeapResource = TritonHeapResource<nvidia::inferenceserver::client::InferInput>;
+using TritonInputCpuShmResource = TritonCpuShmResource<nvidia::inferenceserver::client::InferInput>;
+using TritonInputGpuShmResource = TritonGpuShmResource<nvidia::inferenceserver::client::InferInput>;
+using TritonOutputHeapResource = TritonHeapResource<nvidia::inferenceserver::client::InferRequestedOutput>;
+using TritonOutputCpuShmResource = TritonCpuShmResource<nvidia::inferenceserver::client::InferRequestedOutput>;
+using TritonOutputGpuShmResource = TritonGpuShmResource<nvidia::inferenceserver::client::InferRequestedOutput>;
 using TritonInputData = TritonData<nvidia::inferenceserver::client::InferInput>;
 using TritonInputMap = std::unordered_map<std::string, TritonInputData>;
 using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferRequestedOutput>;
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
+template <>
+void TritonInputHeapResource::copy(const void* values, size_t offset);
+template <>
+void TritonInputCpuShmResource::copy(const void* values, size_t offset);
+template <>
+void TritonInputGpuShmResource::copy(const void* values, size_t offset);
+template <>
+void TritonOutputHeapResource::copy(void** values);
+template <>
+void TritonOutputCpuShmResource::copy(void** values);
+template <>
+void TritonOutputGpuShmResource::copy(void** values);
 template <>
 std::string TritonInputData::xput() const;
 template <>

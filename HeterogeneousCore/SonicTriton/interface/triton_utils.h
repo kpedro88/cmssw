@@ -8,8 +8,7 @@
 #include <vector>
 #include <unordered_set>
 
-#define TRITON_ENABLE_GPU
-#include "grpc_client.h"
+#include "HeterogeneousCore/SonicTriton/interface/grpc_client_gpu.h"
 
 #include "cuda_runtime_api.h"
 

@@ -13,8 +13,7 @@
 #include <exception>
 #include <unordered_map>
 
-#define TRITON_ENABLE_GPU
-#include "grpc_client.h"
+#include "HeterogeneousCore/SonicTriton/interface/grpc_client_gpu.h"
 #include "grpc_service.pb.h"
 
 class TritonClient : public SonicClient<TritonInputMap, TritonOutputMap> {

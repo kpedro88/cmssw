@@ -9,8 +9,6 @@
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
 
-#include "cuda_runtime_api.h"
-
 #include <string>
 #include <cmath>
 #include <chrono>

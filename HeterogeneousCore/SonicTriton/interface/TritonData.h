@@ -12,16 +12,19 @@
 #include <memory>
 #include <atomic>
 
-#define TRITON_ENABLE_GPU
-#include "grpc_client.h"
+#include "HeterogeneousCore/SonicTriton/interface/grpc_client_gpu.h"
 #include "grpc_service.pb.h"
 
 //forward declaration
-template <typename IO>
-class TritonData;
 class TritonClient;
-struct cudaIpcMemHandle_st;
-typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
+template <typename IO>
+class TritonMemResource;
+template <typename IO>
+class TritonHeapResource;
+template <typename IO>
+class TritonCpuShmResource;
+template <typename IO>
+class TritonGpuShmResource;
 
 //aliases for local input and output types
 template <typename DT>
@@ -32,60 +35,6 @@ using TritonOutput = std::vector<edm::Span<const DT*>>;
 //other useful typdefs
 template <typename DT>
 using TritonInputContainer = std::shared_ptr<TritonInput<DT>>;
-
-//base class for memory operations
-template <typename IO>
-class TritonMemResource {
-public:
-  TritonMemResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
-  virtual ~TritonMemResource() {}
-  uint8_t* addr() { return addr_; }
-  size_t size() const { return size_; }
-  bool status() const { return status_; }
-  virtual void copy(const void* values, size_t offset) {}
-  virtual void copy(const uint8_t** values) {}
-  virtual bool set(bool canThrow);
-
-protected:
-  //member variables
-  TritonData<IO>* data_;
-  std::string name_;
-  size_t size_;
-  uint8_t* addr_;
-  bool status_;
-};
-
-template <typename IO>
-class TritonHeapResource : public TritonMemResource<IO> {
-public:
-  TritonHeapResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
-  ~TritonHeapResource() override {}
-  void copy(const void* values, size_t offset) override {}
-  void copy(const uint8_t** values) override {}
-  bool set(bool canThrow) override { return true; }
-};
-
-template <typename IO>
-class TritonCpuShmResource : public TritonMemResource<IO> {
-public:
-  TritonCpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
-  ~TritonCpuShmResource() override;
-  void copy(const void* values, size_t offset) override {}
-  void copy(const uint8_t** values) override {}
-};
-
-template <typename IO>
-class TritonGpuShmResource : public TritonMemResource<IO> {
-public:
-  TritonGpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
-  ~TritonGpuShmResource() override;
-  void copy(const void* values, size_t offset) override {}
-  void copy(const uint8_t** values) override {}
-
-protected:
-  int deviceId_;
-  std::shared_ptr<cudaIpcMemHandle_t> handle_;
-};
 
 //store all the info needed for triton input and output
 template <typename IO>
@@ -142,7 +91,7 @@ private:
   bool updateMem(size_t size, bool can_throw);
   void computeSizes();
   void resetSizes();
-  auto client();
+  nvidia::inferenceserver::client::InferenceServerGrpcClient* client();
 
   //helpers
   bool anyNeg(const ShapeView& vec) const {
@@ -183,30 +132,12 @@ private:
   std::shared_ptr<Result> result_;
 };
 
-using TritonInputHeapResource = TritonHeapResource<nvidia::inferenceserver::client::InferInput>;
-using TritonInputCpuShmResource = TritonCpuShmResource<nvidia::inferenceserver::client::InferInput>;
-using TritonInputGpuShmResource = TritonGpuShmResource<nvidia::inferenceserver::client::InferInput>;
-using TritonOutputHeapResource = TritonHeapResource<nvidia::inferenceserver::client::InferRequestedOutput>;
-using TritonOutputCpuShmResource = TritonCpuShmResource<nvidia::inferenceserver::client::InferRequestedOutput>;
-using TritonOutputGpuShmResource = TritonGpuShmResource<nvidia::inferenceserver::client::InferRequestedOutput>;
 using TritonInputData = TritonData<nvidia::inferenceserver::client::InferInput>;
 using TritonInputMap = std::unordered_map<std::string, TritonInputData>;
 using TritonOutputData = TritonData<nvidia::inferenceserver::client::InferRequestedOutput>;
 using TritonOutputMap = std::unordered_map<std::string, TritonOutputData>;
 
 //avoid "explicit specialization after instantiation" error
-template <>
-void TritonInputHeapResource::copy(const void* values, size_t offset);
-template <>
-void TritonInputCpuShmResource::copy(const void* values, size_t offset);
-template <>
-void TritonInputGpuShmResource::copy(const void* values, size_t offset);
-template <>
-void TritonOutputHeapResource::copy(const uint8_t** values);
-template <>
-void TritonOutputCpuShmResource::copy(const uint8_t** values);
-template <>
-void TritonOutputGpuShmResource::copy(const uint8_t** values);
 template <>
 std::string TritonInputData::xput() const;
 template <>

@@ -43,7 +43,7 @@ public:
   size_t size() const { return size_; }
   bool status() const { return status_; }
   virtual void copy(const void* values, size_t offset) {}
-  virtual void copy(void** values) {}
+  virtual void copy(const uint8_t** values) {}
   virtual bool set(bool canThrow);
 
 protected:
@@ -61,7 +61,7 @@ public:
   TritonHeapResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
   ~TritonHeapResource() override {}
   void copy(const void* values, size_t offset) override {}
-  void copy(void** values) override {}
+  void copy(const uint8_t** values) override {}
   bool set(bool canThrow) override { return true; }
 };
 
@@ -71,7 +71,7 @@ public:
   TritonCpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
   ~TritonCpuShmResource() override;
   void copy(const void* values, size_t offset) override {}
-  void copy(void** values) override {}
+  void copy(const uint8_t** values) override {}
 };
 
 template <typename IO>
@@ -80,7 +80,7 @@ public:
   TritonGpuShmResource(TritonData<IO>* data, const std::string& name, size_t size, bool canThrow);
   ~TritonGpuShmResource() override;
   void copy(const void* values, size_t offset) override {}
-  void copy(void** values) override {}
+  void copy(const uint8_t** values) override {}
 
 protected:
   int deviceId_;
@@ -98,9 +98,6 @@ public:
 
   //constructor
   TritonData(const std::string& name, const TensorMetadata& model_info, TritonClient* client, const std::string& pid);
-
-  //destructor
-  ~TritonData();
 
   //some members can be modified
   bool setShape(const ShapeType& newShape) { return setShape(newShape, true); }
@@ -205,11 +202,11 @@ void TritonInputCpuShmResource::copy(const void* values, size_t offset);
 template <>
 void TritonInputGpuShmResource::copy(const void* values, size_t offset);
 template <>
-void TritonOutputHeapResource::copy(void** values);
+void TritonOutputHeapResource::copy(const uint8_t** values);
 template <>
-void TritonOutputCpuShmResource::copy(void** values);
+void TritonOutputCpuShmResource::copy(const uint8_t** values);
 template <>
-void TritonOutputGpuShmResource::copy(void** values);
+void TritonOutputGpuShmResource::copy(const uint8_t** values);
 template <>
 std::string TritonInputData::xput() const;
 template <>

@@ -48,11 +48,11 @@ void TritonInputHeapResource::copy(const void* values, size_t offset) {
 }
 
 template <>
-void TritonOutputHeapResource::copy(void** values) {
+void TritonOutputHeapResource::copy(const uint8_t** values) {
   size_t contentByteSize;
   triton_utils::throwIfError(
       data_->result_->RawData(
-          data_->name_, const_cast<const uint8_t**>(reinterpret_cast<uint8_t**>(values)), &contentByteSize),
+          data_->name_, values, &contentByteSize),
       data_->name_ + " fromServer(): unable to get raw");
   if (contentByteSize != data_->totalByteSize_) {
     throw cms::Exception("TritonDataError") << data_->name_ << " fromServer(): unexpected content byte size "
@@ -125,7 +125,7 @@ void TritonInputCpuShmResource::copy(const void* values, size_t offset) {
 }
 
 template <>
-void TritonOutputCpuShmResource::copy(void** values) {
+void TritonOutputCpuShmResource::copy(const uint8_t** values) {
   *values = addr_;
 }
 
@@ -161,7 +161,7 @@ void TritonInputGpuShmResource::copy(const void* values, size_t offset) {
 }
 
 template <>
-void TritonOutputGpuShmResource::copy(void** values) {
+void TritonOutputGpuShmResource::copy(const uint8_t** values) {
   //copy back from gpu, keep in scope
   auto ptr = std::make_shared<std::vector<uint8_t>>(data_->totalByteSize_);
   triton_utils::cudaCheck(
@@ -200,11 +200,6 @@ TritonData<IO>::TritonData(const std::string& name,
   IO* iotmp;
   createObject(&iotmp);
   data_.reset(iotmp);
-}
-
-template <typename IO>
-TritonData<IO>::~TritonData() {
-  memResource_.reset();
 }
 
 template <>
@@ -379,8 +374,8 @@ TritonOutput<DT> TritonOutputData::fromServer() const {
                                             << " (should be " << byteSize_ << " for " << dname_ << ")";
   }
 
-  uint8_t* r0;
-  memResource_->copy((void**)&r0);
+  const uint8_t* r0;
+  memResource_->copy(&r0);
   const DT* r1 = reinterpret_cast<const DT*>(r0);
 
   TritonOutput<DT> dataOut;

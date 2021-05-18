@@ -17,10 +17,6 @@
 #include "grpc_client.h"
 #include "grpc_service.pb.h"
 
-//forward declaration
-struct cudaIpcMemHandle_st;
-typedef cudaIpcMemHandle_st cudaIpcMemHandle_t;
-
 class TritonClient : public SonicClient<TritonInputMap, TritonOutputMap> {
 public:
   struct ServerSideStats {

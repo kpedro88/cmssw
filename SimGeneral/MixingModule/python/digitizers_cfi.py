@@ -39,7 +39,7 @@ theDigitizers = cms.PSet(
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
 fastSim.toModify(theDigitizers,
     # fastsim does not model castor
-    castor = None,
+#    castor = None,
     # fastsim does not digitize pixel and strip hits
     pixel = None,
     strip = None,
@@ -68,7 +68,7 @@ phase2_hfnose.toModify( theDigitizers,
 )
 
 from Configuration.Eras.Modifier_run3_common_cff import run3_common
-run3_common.toModify( theDigitizers, castor = None )
+(run3_common | fastSim).toModify( theDigitizers, castor = None )
 
 from SimGeneral.MixingModule.ecalTimeDigitizer_cfi import ecalTimeDigitizer
 from Configuration.Eras.Modifier_phase2_timing_cff import phase2_timing

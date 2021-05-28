@@ -65,4 +65,4 @@ phase2_muon.toModify( trackingParticles, simHitCollections = dict(
         muon = trackingParticles.simHitCollections.muon+[cms.InputTag("g4SimHits","MuonME0Hits")]))
 
 from Configuration.Eras.Modifier_phase2_tracker_cff import phase2_tracker
-phase2_tracker.toModify( trackingParticles, simHitCollections = dict( tracker = []) )
+(phase2_tracker & ~fastSim).toModify( trackingParticles, simHitCollections = dict( tracker = []) )

@@ -25,6 +25,14 @@ else
 	fi
 fi
 
+THIS_ARCH=$(echo $SCRAM_ARCH | cut -d'_' -f2)
+if [ "$THIS_ARCH" == "amd64" ]; then
+       echo "has amd64"
+else
+       echo "missing amd64"
+       exit 0
+fi
+
 if type singularity >& /dev/null; then
 	echo "has singularity"
 else

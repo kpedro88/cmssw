@@ -127,6 +127,7 @@ DOCKER="sudo docker"
 LOG="log_${SERVER}.log"
 STOPLOG="log_stop_${SERVER}.log"
 LIB=lib
+USRLIB=usrlib
 STARTED_INDICATOR="Started GRPCInferenceService"
 SEGFAULT_INDICATOR="Address already in use"
 EXTRA=""
@@ -207,16 +208,13 @@ start_singularity(){
 	done
 
 	# workaround for nvidia libs w/ singularity-in-singularity
-	# from https://github.com/hpcng/singularity/issues/5759#issuecomment-919523970
 	if [ -d /.singularity.d/libs ]; then
-		TMPD=`mktemp -d`
-		(echo '#!/bin/bash'; echo 'exec /usr/sbin/ldconfig -C '"$TMPD"'/ld.so.cache "$@"') > $TMPD/ldconfig
-		chmod +x $TMPD/ldconfig
-		PATH=$TMPD:$PATH
-		ldconfig $LD_LIBRARY_PATH
-
-		# bind nvidia libs to dir where triton entrypoint can find them
-		MOUNTARGS="$MOUNTARGS -B /.singularity.d/libs:/usr/libs"
+		$DRYRUN mkdir ${USRLIB}
+		$DRYRUN ln -s ${SANDBOX}/usr/lib64/* ${USRLIB}/
+		# two levels of symlinks so /.singularity.d from outer container can be bound into inner container
+		$DRYRUN ln -s /.singularity.d ${USRLIB}/singularity.d
+		$DRYRUN cd ${USRLIB} && $DRYRUN ln -s singularity.d/libs/* . && $DRYRUN rm singularity.d && $DRYRUN cd -
+		MOUNTARGS="$MOUNTARGS -B ${USRLIB}:/usr/lib64 -B /.singularity.d:/usr/lib64/singularity.d"
 	fi
 
 	# start instance

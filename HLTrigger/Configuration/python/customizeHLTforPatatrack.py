@@ -46,8 +46,10 @@ def customiseCommon(process):
     )
 
     if 'Status_OnCPU' in process.__dict__:
+        print("CPU!!!!")
         replace_with(process.Status_OnCPU, cms.Path(process.statusOnGPU + ~process.statusOnGPUFilter))
     else:
+        print("Not CPU!!!!")
         process.Status_OnCPU = cms.Path(process.statusOnGPU + ~process.statusOnGPUFilter)
         if 'HLTSchedule' in process.__dict__:
             process.HLTSchedule.append(process.Status_OnCPU)
@@ -55,8 +57,10 @@ def customiseCommon(process):
             process.schedule.append(process.Status_OnCPU)
 
     if 'Status_OnGPU' in process.__dict__:
+        print("GPU!!!!")
         replace_with(process.Status_OnGPU, cms.Path(process.statusOnGPU + process.statusOnGPUFilter))
     else:
+        print("Not GPU!!!!")
         process.Status_OnGPU = cms.Path(process.statusOnGPU + process.statusOnGPUFilter)
         if 'HLTSchedule' in process.__dict__:
             process.HLTSchedule.append(process.Status_OnGPU)
@@ -93,7 +97,7 @@ def customiseCommon(process):
 
 # customisation for running the "Patatrack" pixel local reconstruction
 def customisePixelLocalReconstruction(process):
-
+    print("test", process.__dict__)
     if not 'HLTDoLocalPixelSequence' in process.__dict__:
         return process
 
@@ -656,10 +660,15 @@ def enablePatatrackPixelTriplets(process):
 
 # customisation for running the Patatrack reconstruction, with automatic offload via CUDA when a supported gpu is available
 def customizeHLTforPatatrack(process):
+    print("Customize!!!!")
     process = customiseCommon(process)
+    print("Customize!!!! 1")
     process = customisePixelLocalReconstruction(process)
+    print("Customize!!!! 2")
     process = customisePixelTrackReconstruction(process)
+    print("Customize!!!! 3")
     process = customiseEcalLocalReconstruction(process)
+    print("Customize!!!! 4")
     process = customiseHcalLocalReconstruction(process)
     return process
 

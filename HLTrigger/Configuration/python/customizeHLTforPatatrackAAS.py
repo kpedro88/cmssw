@@ -46,7 +46,6 @@ def customiseCommon(process):
     )
 
     if 'Status_OnCPU' in process.__dict__:
-        print("CPU!!!!")
         replace_with(process.Status_OnCPU, cms.Path(process.statusOnGPU + ~process.statusOnGPUFilter))
     else:
         print("Not CPU!!!!")
@@ -57,7 +56,6 @@ def customiseCommon(process):
             process.schedule.append(process.Status_OnCPU)
 
     if 'Status_OnGPU' in process.__dict__:
-        print("GPU!!!!")
         replace_with(process.Status_OnGPU, cms.Path(process.statusOnGPU + process.statusOnGPUFilter))
     else:
         print("Not GPU!!!!")
@@ -203,7 +201,6 @@ def customisePixelLocalReconstruction(process):
 
 
     # Tasks and Sequences
-    print("Here!!!!!!")
     process.HLTDoLocalPixelTask = cms.Task(
           process.hltOnlineBeamSpotToCUDA,                  # transfer the beamspot to the gpu
           process.hltSiPixelClustersCUDA,                   # reconstruct the pixel digis and clusters on the gpu
@@ -217,7 +214,6 @@ def customisePixelLocalReconstruction(process):
           process.hltSiPixelClustersCache,                  # legacy module, used by the legacy pixel quadruplet producer
           process.hltSiPixelRecHits                         # SwitchProducer wrapping the legacy pixel rechit producer or the transfer of the pixel rechits to the host and the conversion from SoA
         )
-
     process.HLTDoLocalPixelSequence = cms.Sequence(process.HLTDoLocalPixelTask)
 
 
@@ -348,6 +344,60 @@ def customisePixelTrackReconstruction(process):
 
 
     # done
+    return process
+
+
+# customisation for running the "Patatrack" pixel track reconstruction
+def customisePixelTrackReconstructionAAS(process):
+
+    if not 'HLTRecoPixelTracksSequence' in process.__dict__:
+        return process
+
+    hasHLTPixelVertexReco = 'HLTRecopixelvertexingSequence' in process.__dict__
+
+    # FIXME replace the Sequences with empty ones to avoid expanding them during the (re)definition of Modules and EDAliases
+    process.HLTDoLocalPixelSequence    = cms.Sequence()
+    process.HLTRecoPixelTracksSequence = cms.Sequence()
+    if hasHLTPixelVertexReco:
+        process.HLTRecopixelvertexingSequence = cms.Sequence()
+
+    # cpu only: convert the pixel rechits from legacy to SoA format
+    process.load("HeterogeneousCore.SonicTriton.TritonService_cff")
+    process.TritonService.verbose = True
+    # fallback server
+    process.TritonService.fallback.enable  = False
+    process.TritonService.fallback.verbose = False
+    process.TritonService.fallback.useGPU  = False
+    process.TritonService.servers.append(
+        cms.PSet(
+            name = cms.untracked.string("default"),
+            #address = cms.untracked.string("prp-gpu-1.t2.ucsd.edu"),
+            #address = cms.untracked.string("ailab01.fnal.gov"),
+            #port = cms.untracked.uint32(8001),
+            address = cms.untracked.string("104.197.15.13"),
+            #address = cms.untracked.string("35.226.148.239"),
+            port = cms.untracked.uint32(8021),
+        )
+    )
+
+    from RecoBTag.ONNXRuntime.patatrack_cff import patatrackSONIC as pttSONIC
+    process.hltPTTSONIC = pttSONIC.clone()
+
+    process.HLTRecoPixelTracksTask = cms.Task(
+          process.hltPTTSONIC            # from the original sequence
+    )
+    process.HLTRecoPixelTracksSequence = cms.Sequence(process.HLTRecoPixelTracksTask)
+
+    if hasHLTPixelVertexReco:
+        process.HLTRecopixelvertexingTask = cms.Task(
+            process.HLTRecoPixelTracksTask
+        )
+        process.HLTRecopixelvertexingSequence = cms.Sequence(
+             process.HLTRecopixelvertexingTask
+        )
+        print("Here!!!!",process.HLTRecopixelvertexingSequence)
+    # done
+    print(process.HLTRecoPixelTracksTask)
     return process
 
 
@@ -663,9 +713,10 @@ def customizeHLTforPatatrack(process):
     print("Customize!!!!")
     process = customiseCommon(process)
     print("Customize!!!! 1")
-    process = customisePixelLocalReconstruction(process)
+    #process = customisePixelLocalReconstruction(process)
     print("Customize!!!! 2")
-    process = customisePixelTrackReconstruction(process)
+    #process = customisePixelTrackReconstruction(process)
+    process  = customisePixelTrackReconstructionAAS(process)
     print("Customize!!!! 3")
     #process = customiseEcalLocalReconstruction(process)
     print("Customize!!!! 4")

@@ -60,6 +60,12 @@
    <version ClassVersion="10" checksum="414205262"/>
   </class>
 
+  <class name="SiPixelRecHitsSoA" ClassVersion="-1">
+    <version ClassVersion="-1" checksum="4083884785"/>
+  </class>
+  <class name="edm::Wrapper<SiPixelRecHitsSoA>" persistent="false"/>
+
+
   <class name="std::vector<SiStripRecHit2D*>"/>
   <class name="std::vector<SiStripRecHit1D*>"/>
   <class name="std::vector<SiStripMatchedRecHit2D*>"/>

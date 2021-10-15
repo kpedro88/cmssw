@@ -60,7 +60,6 @@ void SiPixelRecHitFromCUDAaaS::fillDescriptions(edm::ConfigurationDescriptions& 
 
 void SiPixelRecHitFromCUDAaaS::produce(edm::Event& iEvent, edm::EventSetup const& es) {
   edm::Handle<SiPixelRecHitsSoA> hits     = iEvent.getHandle(hitsToken_);
-  std::cout << " -- " << hits->size() << std::endl;
   nHits_ = hits->size();
 
   /*
@@ -77,7 +76,6 @@ void SiPixelRecHitFromCUDAaaS::produce(edm::Event& iEvent, edm::EventSetup const
   } 
   std::cout << " ---> Hits position " << std::endl;
   */
-  //if(nHits_ > 0) std::cout << "hits/pos---> " << nHits_ << " -- " << " -- " << hits->posVector()[0] << " -- " << hits->posVector()[10] << " -- " << hits->posVector()[139] << " -- " << nHits_ << std::endl;
 
   auto hmsp = std::make_unique<uint32_t[]>(gpuClustering::maxNumModules + 1);
   SiPixelRecHitCollection output;
@@ -174,7 +172,6 @@ void SiPixelRecHitFromCUDAaaS::produce(edm::Event& iEvent, edm::EventSetup const
 
   LogDebug("SiPixelRecHitFromCUDAaaS") << "found " << numberOfDetUnits << " dets, " << numberOfClusters << " clusters";
 
-  std::cout << "---> Done " << std::endl;
   iEvent.emplace(rechitsPutToken_, std::move(output));
 }
 

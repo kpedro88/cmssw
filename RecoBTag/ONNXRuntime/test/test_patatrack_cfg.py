@@ -3,10 +3,10 @@ from PhysicsTools.PatAlgos.tools.helpers import getPatAlgosToolsTask
 
 from FWCore.ParameterSet.VarParsing import VarParsing
 options = VarParsing('analysis')
-options.inputFiles  = 'file:test2.root'
+options.inputFiles  = 'file:tmp.root'
 #options.inputFiles = '/store/mc/RunIIFall17MiniAODv2/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/MINIAODSIM/PU2017_12Apr2018_94X_mc2017_realistic_v14-v1/90000/DCFE3F5F-AE42-E811-B6DB-008CFAF72A64.root'
 #options.inputFiles = 'file:/storage/local/data1/home/jduarte1/forPatrick/FFA0194D-1BBC-EF4F-9B8F-8FBED2C62FC8.root'
-options.maxEvents = 10
+options.maxEvents = -1
 options.parseArguments()
 
 from Configuration.ProcessModifiers.enableSonicTriton_cff import enableSonicTriton
@@ -31,10 +31,11 @@ process.options = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 
 ## Source
 process.source = cms.Source("PoolSource",
-                             skipBadFiles = cms.untracked.bool(True),
-                             bypassVersionCheck = cms.untracked.bool(True),
+                            skipBadFiles = cms.untracked.bool(True),
+                            bypassVersionCheck = cms.untracked.bool(True),
                             overrideCatalog=cms.untracked.string(''),
-                            fileNames=cms.untracked.vstring('file:test2.root')
+                            fileNames=cms.untracked.vstring('file:tmp.root')
+                            #fileNames=cms.untracked.vstring('file:test2.root')
 )
 ## Maximal Number of Events
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
@@ -48,60 +49,95 @@ process.TritonService.fallback.useGPU  = False
 process.TritonService.servers.append(
     cms.PSet(
         name = cms.untracked.string("default"),
-        #address = cms.untracked.string("prp-gpu-1.t2.ucsd.edu"),
-        #address = cms.untracked.string("ailab01.fnal.gov"),
-        #port = cms.untracked.uint32(8001),
         address = cms.untracked.string("104.197.15.13"),
-        #address = cms.untracked.string("35.226.148.239"),
         port = cms.untracked.uint32(8021),
     )
 )
 
 
 ## Geometry and Detector Conditions (needed for a few patTuple production steps)
-#process.load("Configuration.Geometry.GeometryRecoDB_cff")
-#process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
-#from Configuration.AlCa.GlobalTag import GlobalTag
-#process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2017_realistic')
-#process.load("Configuration.StandardSequences.MagneticField_cff")
+process.load("Configuration.Geometry.GeometryRecoDB_cff")
+process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
+from Configuration.AlCa.GlobalTag import GlobalTag
+process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2017_realistic')
+process.load("Configuration.StandardSequences.MagneticField_cff")
 
-process.test  = cms.EDProducer("PatatrackSonicProducer",
-                               InputLabel = cms.InputTag('rawDataCollector'),
-                               CablingMapLabel = cms.string(''),
-                               #preprocess_json = 'RecoBTag/Combined/data/ParticleNetAK4/CHS/V00/preprocess.json',
-                               Client = cms.PSet(
-                                   timeout = cms.untracked.uint32(300),
-                                   mode = cms.string("Async"),
-                                   modelName = cms.string("identity_fp32"),
-                                   #modelName = cms.string("facile_all"),
-                                   modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/particlenet_AK4/config.pbtxt"),
-                                   #modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/facile_all_v5/config.pbtxt"),
-                                   modelVersion = cms.string("1"),
-                                   verbose = cms.untracked.bool(False),
-                                   allowedTries = cms.untracked.uint32(0),
-                                   useSharedMemory = cms.untracked.bool(False),
-                                   compression = cms.untracked.string(""),
-                               ),
-                               
+
+#process.test  = cms.EDProducer("PatatrackSonicProducer",
+#                               InputLabel = cms.InputTag('rawDataCollector'),
+#                               CablingMapLabel = cms.string(''),
+#                               #preprocess_json = 'RecoBTag/Combined/data/ParticleNetAK4/CHS/V00/preprocess.json',
 #                               Client = cms.PSet(
 #                                   timeout = cms.untracked.uint32(300),
 #                                   mode = cms.string("Async"),
-#                                   modelName = cms.string("particlenet_AK4"),
+#                                   modelName = cms.string("identity_fp32"),
+#                                   #modelName = cms.string("facile_all"),
 #                                   modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/particlenet_AK4/config.pbtxt"),
-#                                   modelVersion = cms.string(""),
-#                                   verbose = cms.untracked.bool(True),
+#                                   #modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/facile_all_v5/config.pbtxt"),
+#                                   modelVersion = cms.string("1"),
+#                                   verbose = cms.untracked.bool(False),
 #                                   allowedTries = cms.untracked.uint32(0),
-#                                   useSharedMemory = cms.untracked.bool(True),
+#                                   useSharedMemory = cms.untracked.bool(False),
 #                                   compression = cms.untracked.string(""),
-#                                   preferredServer = cms.untracked.string(""),
-#                                   outputs  = cms.untracked.vstring(""),
 #                               ),
-                               debugMode = cms.untracked.bool(False)
-    )
+#                               
+##                               Client = cms.PSet(
+##                                   timeout = cms.untracked.uint32(300),
+##                                   mode = cms.string("Async"),
+##                                   modelName = cms.string("particlenet_AK4"),
+##                                   modelConfigPath = cms.FileInPath("HeterogeneousCore/SonicTriton/data/models/particlenet_AK4/config.pbtxt"),
+##                                   modelVersion = cms.string(""),
+##                                   verbose = cms.untracked.bool(True),
+##                                   allowedTries = cms.untracked.uint32(0),
+##                                   useSharedMemory = cms.untracked.bool(True),
+##                                   compression = cms.untracked.string(""),
+##                                   preferredServer = cms.untracked.string(""),
+##                                   outputs  = cms.untracked.vstring(""),
+##                               ),
+#                               debugMode = cms.untracked.bool(False)
+#    )
+
+from RecoBTag.ONNXRuntime.patatrack_cff import patatrackSONIC as pttSONIC
+process.hltPTTSONIC      = pttSONIC.clone()
+#process.test = pttSONIC.clone()
+
+from RecoLocalTracker.SiPixelClusterizer.siPixelDigisClustersFromSoA_cfi import siPixelDigisClustersFromSoA as _siPixelDigisClustersFromSoA
+process.hltSiPixelClusters = _siPixelDigisClustersFromSoA.clone(
+    src = "hltPTTSONIC"
+)
 
 
+from RecoLocalTracker.SiPixelRecHits.siPixelRecHitFromCUDAaaS_cfi import siPixelRecHitFromCUDAaaS as _siPixelRecHitFromCUDAaaS
+process.hltSiPixelRecHits = _siPixelRecHitFromCUDAaaS.clone(
+    pixelRecHitSrc = "hltPTTSONIC",
+    src = "hltSiPixelClusters"
+)
 
-process.p = cms.Path(process.test)
+from RecoPixelVertexing.PixelTrackFitting.pixelTrackProducerFromSoA_cfi import pixelTrackProducerFromSoA as _pixelTrackProducerFromSoA
+process.hltPixelTracks = _pixelTrackProducerFromSoA.clone(
+    beamSpot = "hltOnlineBeamSpot",
+    pixelRecHitLegacySrc = "hltSiPixelRecHits",
+    trackSrc = "hltPTTSONIC",
+    #minNumberOfHits = cms.int32(0),
+    minQuality = cms.string('dup'),
+)
+
+from RecoPixelVertexing.PixelVertexFinding.pixelVertexFromSoA_cfi import pixelVertexFromSoA as _pixelVertexFromSoA
+process.hltPixelVertices = _pixelVertexFromSoA.clone(
+    src = "hltPTTSONIC",
+    TrackCollection = "hltPixelTracks",
+    beamSpot = "hltOnlineBeamSpot"
+)
+
+process.p = cms.Path(
+    process.hltPTTSONIC*
+    process.hltSiPixelClusters*
+    process.hltSiPixelRecHits*
+    process.hltPixelTracks*
+    process.hltPixelVertices
+)
+
+#process.p = cms.Path(process.test)
 
 patAlgosToolsTask = getPatAlgosToolsTask(process)
 
@@ -128,8 +164,8 @@ process.out.fileName = 'test_particle_net_MINIAODSIM_noragged.root'
 
 process.options = cms.untracked.PSet(
     wantSummary = cms.untracked.bool( True ),
-    numberOfThreads = cms.untracked.uint32( 1 ),
-    numberOfStreams = cms.untracked.uint32( 1 ),
-    sizeOfStackForThreadsInKB = cms.untracked.uint32( 10*1024 )
+    numberOfThreads = cms.untracked.uint32( 8 ),
+    numberOfStreams = cms.untracked.uint32( 8 ),
+    sizeOfStackForThreadsInKB = cms.untracked.uint32( 100*1024 )
 )
 

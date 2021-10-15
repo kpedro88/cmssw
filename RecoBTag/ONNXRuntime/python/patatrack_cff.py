@@ -14,7 +14,7 @@ patatrackSONIC  = cms.EDProducer("PatatrackSonicProducer",
                                    modelVersion = cms.string("1"),
                                    verbose = cms.untracked.bool(False),
                                    allowedTries = cms.untracked.uint32(0),
-                                   useSharedMemory = cms.untracked.bool(False),
+                                   useSharedMemory = cms.untracked.bool(True),
                                    compression = cms.untracked.string(""),
                                ),
 

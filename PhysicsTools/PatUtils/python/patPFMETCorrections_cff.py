@@ -105,6 +105,8 @@ patSmearedJets = cms.EDProducer("SmearedPATJetProducer",
 
     enabled = cms.bool(True),  # If False, no smearing is performed
 
+    store_factor = cms.uint32(0),
+
     rho = cms.InputTag("fixedGridRhoFastjetAll"),
 
     skipGenMatching = cms.bool(False),  # If True, always skip gen jet matching and smear jet with a random gaussian

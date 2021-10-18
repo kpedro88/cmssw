@@ -3,8 +3,7 @@
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "DataFormats/Common/interface/Handle.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
-#include "HeterogeneousCore/SonicTriton/interface/TritonClient.h"
-#include "HeterogeneousCore/SonicCore/interface/SonicEDProducer.h"
+#include "HeterogeneousCore/SonicTriton/interface/TritonEDProducer.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -12,18 +11,32 @@
 #include "Geometry/CaloTopology/interface/HcalTopology.h"
 #include "Geometry/Records/interface/HcalRecNumberingRecord.h"
 
-class FacileHcalReconstructor : public SonicEDProducer<TritonClient> {
+class FacileHcalReconstructor : public TritonEDProducer<> {
 public:
-  explicit FacileHcalReconstructor(edm::ParameterSet const& cfg)
-      : SonicEDProducer<TritonClient>(cfg),
-        fChannelInfoName_(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
-        fTokChannelInfo_(consumes<HBHEChannelInfoCollection>(fChannelInfoName_)),
-        htopoToken_(esConsumes<HcalTopology, HcalRecNumberingRecord>()) {
-    produces<HBHERecHitCollection>();
-    setDebugName("FacileHcalReconstructor");
-  }
+  explicit FacileHcalReconstructor(const edm::ParameterSet&);
+  void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override;
+  void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override;
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-  void acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) override {
+private:
+  edm::InputTag fChannelInfoName_;
+  edm::EDGetTokenT<HBHEChannelInfoCollection> fTokChannelInfo_;
+  std::vector<HcalDetId> hcalIds_;
+  edm::ESGetToken<HcalTopology, HcalRecNumberingRecord> htopoToken_;
+
+};
+
+FacileHcalReconstructor::FacileHcalReconstructor(edm::ParameterSet const& cfg)
+    : TritonEDProducer<>(cfg,"FacileHcalReconstructor"),
+      fChannelInfoName_(cfg.getParameter<edm::InputTag>("ChannelInfoName")),
+      fTokChannelInfo_(consumes<HBHEChannelInfoCollection>(fChannelInfoName_)),
+      htopoToken_(esConsumes<HcalTopology, HcalRecNumberingRecord>()) {
+    produces<HBHERecHitCollection>();
+    //setDebugName("FacileHcalReconstructor");
+}
+
+
+void FacileHcalReconstructor::acquire(edm::Event const& iEvent, edm::EventSetup const& iSetup, Input& iInput) {
     const auto& hChannelInfo = iEvent.get(fTokChannelInfo_);
 
     const HcalTopology* htopo = &iSetup.getData(htopoToken_);
@@ -31,7 +44,7 @@ public:
     auto& input1 = iInput.begin()->second;
     auto data1 = std::make_shared<TritonInput<float>>();
     data1->reserve(hChannelInfo.size());
-    client_.setBatchSize(hChannelInfo.size());
+    client_->setBatchSize(hChannelInfo.size());
 
     hcalIds_.clear();
 
@@ -59,9 +72,9 @@ public:
     }
 
     input1.toServer(data1);
-  }
+}
 
-  void produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) override {
+void FacileHcalReconstructor::produce(edm::Event& iEvent, edm::EventSetup const& iSetup, Output const& iOutput) {
     std::unique_ptr<HBHERecHitCollection> out;
     out = std::make_unique<HBHERecHitCollection>();
     out->reserve(hcalIds_.size());
@@ -77,20 +90,14 @@ public:
       out->push_back(rh);
     }
     iEvent.put(std::move(out));
-  }
+}
 
-  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void FacileHcalReconstructor::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
     edm::ParameterSetDescription desc;
     TritonClient::fillPSetDescription(desc);
     desc.add<edm::InputTag>("ChannelInfoName");
     descriptions.add("FacileHcalReconstructor", desc);
-  }
+}
 
-private:
-  edm::InputTag fChannelInfoName_;
-  edm::EDGetTokenT<HBHEChannelInfoCollection> fTokChannelInfo_;
-  std::vector<HcalDetId> hcalIds_;
-  edm::ESGetToken<HcalTopology, HcalRecNumberingRecord> htopoToken_;
-};
 
 DEFINE_FWK_MODULE(FacileHcalReconstructor);

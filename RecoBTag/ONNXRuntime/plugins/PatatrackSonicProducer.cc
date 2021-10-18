@@ -16,7 +16,7 @@
 
 #include "HeterogeneousCore/SonicTriton/interface/TritonEDProducer.h"
 #include "HeterogeneousCore/SonicTriton/interface/TritonData.h"
-#include "EventFilter/SiPixelRawToDigi/interface/ErrorChecker.h"
+//#include "EventFilter/SiPixelRawToDigi/interface/ErrorChecker.h"
 #include "EventFilter/SiPixelRawToDigi/interface/PixelDataFormatter.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitsSoA.h"
 
@@ -39,7 +39,7 @@ private:
   std::vector<unsigned int> fedIds_;
   edm::ESGetToken<SiPixelFedCablingMap, SiPixelFedCablingMapRcd> cablingMapToken_;
 
-  PixelDataFormatter::Errors errors_;
+  //PixelDataFormatter::Errors errors_;
   edm::EDGetTokenT<FEDRawDataCollection> rawGetToken_;
   edm::EDPutTokenT<SiPixelRecHitsSoA> hitsSOA_;
   edm::EDPutTokenT<SiPixelDigisSoA> digiPutToken_;
@@ -103,9 +103,9 @@ void PatatrackSonicProducer::acquire(edm::Event const &iEvent, edm::EventSetup c
   auto& vin   = (*feds)[0];
   unsigned int pSize = 0; 
   vin.push_back(fedIds_.size()); pSize++;
-  ErrorChecker errorcheck;
-  bool errorsInEvent = false;
-  errors_.clear();
+  //ErrorChecker errorcheck;
+  //bool errorsInEvent = false;
+  //errors_.clear();
   for (unsigned int fedId : fedIds_) {
     vin.push_back(fedId); pSize++;
     const FEDRawData& rawData = buffers.FEDData(fedId);
@@ -115,9 +115,9 @@ void PatatrackSonicProducer::acquire(edm::Event const &iEvent, edm::EventSetup c
       continue;
     }
     const cms_uint64_t* trailer = reinterpret_cast<const cms_uint64_t*>(rawData.data()) + (nWords - 1);
-    if (not errorcheck.checkCRC(errorsInEvent, fedId, trailer, errors_)) {
-      continue;
-    }
+    //if (not errorcheck.checkCRC(errorsInEvent, fedId, trailer, errors_)) {
+    //  continue;
+   // }
     unsigned int rawsize=rawData.size()/4;
     vin.push_back(rawsize); pSize++;
     vin.resize(vin.size()+rawsize);

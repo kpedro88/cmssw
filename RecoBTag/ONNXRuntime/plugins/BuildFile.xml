@@ -1,9 +1,14 @@
 <use name="FWCore/Framework"/>
 <library file="*.cc" name="RecoBTagONNXRuntimePlugins">
-  <use name="json"/>
-  <use name="DataFormats/BTauReco"/>
-  <use name="PhysicsTools/ONNXRuntime"/>
-  <use name="RecoBTag/FeatureTools"/>
-  <use name="RecoBTag/ONNXRuntime"/>
-  <flags EDM_PLUGIN="1"/>
+ <use name="json"/>
+ <use name="CondFormats/DataRecord"/>
+ <use name="CondFormats/SiPixelObjects"/>
+ <use name="DataFormats/FEDRawData"/>
+ <use name="DataFormats/SiPixelDigi"/>
+ <use name="DataFormats/BTauReco"/>
+ <use name="PhysicsTools/ONNXRuntime"/>
+ <use name="RecoBTag/FeatureTools"/>
+ <use name="RecoBTag/ONNXRuntime"/>
+ <use name="HeterogeneousCore/SonicTriton"/>
+ <flags EDM_PLUGIN="1"/>
 </library>

@@ -32,6 +32,7 @@ protected:
   size_t size_;
   uint8_t* addr_;
   bool closed_;
+  const std::string errMsgSet_;
 };
 
 template <typename IO>
@@ -42,6 +43,10 @@ public:
   void copyInput(const void* values, size_t offset) override {}
   const uint8_t* copyOutput() override { return nullptr; }
   void set() override {}
+
+protected:
+  const std::string errMsgInput_;
+  const std::string errMsgOutput_;
 };
 
 template <typename IO>

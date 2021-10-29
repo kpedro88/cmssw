@@ -1244,6 +1244,51 @@ testFormulaEvaluator::checkFormulaEvaluator() {
     }
   }
 
+  //tests for MET uncertainty
+  {
+    std::vector<double> v = {1.479,0.006,0,0.015,0};
+    std::vector<double> x = {0., 0.};
+    std::vector<double> ys = {0., 2.};
+    reco::FormulaEvaluator f("((abs(y)<[0])?([1]+[2]*x):([3]+[4]*x))");
+    auto func = [&v](double x, double y) {
+      return ((abs(y)<v[0])?(v[1]+v[2]*x):(v[3]+v[4]*x));
+    };
+    for(auto y_i : ys) {
+      x[1] = y_i;
+      CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+    }
+  }
+
+  {
+    std::vector<double> v = {0.00009,0.0085};
+    std::vector<double> x = {100., 1.};
+    reco::FormulaEvaluator f("sqrt(pow([0]*x,2)+pow([1]/sqrt(sin(2*atan(exp(-y)))),2))");
+    auto func = [&v](double x, double y) {
+      return std::sqrt(std::pow(v[0]*x,2)+std::pow(v[1]/std::sqrt(std::sin(2*std::atan(std::exp(-y)))),2));
+    };
+    CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+  }
+
+  {
+    std::vector<double> v = {1.3,0.25,0.64,0.0025,0.30,1.0,0.0016};
+    std::vector<double> x = {100., 1.};
+    reco::FormulaEvaluator f("((abs(y)<[0])?(min([1],sqrt([2]/x+[3]))):(min([4],sqrt([5]/x+[6]))))");
+    auto func = [&v](double x, double y) {
+      return ((std::abs(y)<v[0])?(std::min(v[1],std::sqrt(v[2]/x+v[3]))):(std::min(v[4],std::sqrt(v[5]/x+v[6]))));
+    };
+    CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+  }
+
+  {
+    std::vector<double> v = {0.0009,0.000001,0};
+    std::vector<double> x = {100., 1.};
+    reco::FormulaEvaluator f("sqrt([0]/x+[1])+[2]*y");
+    auto func = [&v](double x, double y) {
+        return std::sqrt(v[0]/x+v[1])+v[2]*y;
+    };
+    CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+  }
+
   {
     auto t = [] () {
       reco::FormulaEvaluator f("doesNotExist(2)");

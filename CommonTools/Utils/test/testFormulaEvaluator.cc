@@ -1249,13 +1249,18 @@ testFormulaEvaluator::checkFormulaEvaluator() {
     std::vector<double> v = {1.479,0.006,0,0.015,0};
     std::vector<double> x = {0., 0.};
     std::vector<double> ys = {0., 2.};
-    reco::FormulaEvaluator f("((abs(y)<[0])?([1]+[2]*x):([3]+[4]*x))");
+    reco::FormulaEvaluator f("((abs(y)<[0])*([1]+[2]*x)+(abs(y)>=[0])*([3]+[4]*x))");
     auto func = [&v](double x, double y) {
+      return ((abs(y)<v[0])*(v[1]+v[2]*x)+(abs(y)>=v[0])*(v[3]+v[4]*x));
+    };
+    //compare to the original ternary implementation
+    auto func2 = [&v](double x, double y) {
       return ((abs(y)<v[0])?(v[1]+v[2]*x):(v[3]+v[4]*x));
     };
     for(auto y_i : ys) {
       x[1] = y_i;
       CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+      CPPUNIT_ASSERT( compare( f.evaluate(x,v), func2(x[0],x[1]) ) );
     }
   }
 
@@ -1272,11 +1277,16 @@ testFormulaEvaluator::checkFormulaEvaluator() {
   {
     std::vector<double> v = {1.3,0.25,0.64,0.0025,0.30,1.0,0.0016};
     std::vector<double> x = {100., 1.};
-    reco::FormulaEvaluator f("((abs(y)<[0])?(min([1],sqrt([2]/x+[3]))):(min([4],sqrt([5]/x+[6]))))");
+    reco::FormulaEvaluator f("((abs(y)<[0])*(min([1],sqrt([2]/x+[3])))+(abs(y)>=[0])*(min([4],sqrt([5]/x+[6]))))");
     auto func = [&v](double x, double y) {
+      return ((std::abs(y)<v[0])*(std::min(v[1],std::sqrt(v[2]/x+v[3])))+(abs(y)>=v[0])*(std::min(v[4],std::sqrt(v[5]/x+v[6]))));
+    };
+    //compare to the original ternary implementation
+    auto func2 = [&v](double x, double y) {
       return ((std::abs(y)<v[0])?(std::min(v[1],std::sqrt(v[2]/x+v[3]))):(std::min(v[4],std::sqrt(v[5]/x+v[6]))));
     };
     CPPUNIT_ASSERT( compare( f.evaluate(x,v), func(x[0],x[1]) ) );
+    CPPUNIT_ASSERT( compare( f.evaluate(x,v), func2(x[0],x[1]) ) );
   }
 
   {

@@ -20,14 +20,13 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/InputTag.h"
 
+#include "CommonTools/Utils/interface/FormulaEvaluator.h"
 #include "CommonTools/Utils/interface/StringCutObjectSelector.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
 #include "DataFormats/Candidate/interface/LeafCandidate.h"
 
 #include <string>
 #include <vector>
-
-#include <TF2.h>
 
 class ShiftedParticleProducer : public edm::stream::EDProducer<>
 {
@@ -51,19 +50,19 @@ class ShiftedParticleProducer : public edm::stream::EDProducer<>
 
   struct binningEntryType
   {
-  binningEntryType(std::string uncertainty, std::string moduleLabel)
+  binningEntryType(const std::string& uncertainty, const std::string& moduleLabel)
       : binSelection_(nullptr),
       binUncertainty_(uncertainty),
       energyDep_(false)
     {
-      binUncFormula_ = std::make_unique<TF2>(std::string(moduleLabel).append("_uncFormula").c_str(), binUncertainty_.c_str() );
+      binUncFormula_ = std::make_unique<reco::FormulaEvaluator>(binUncertainty_);
     }
-  binningEntryType(const edm::ParameterSet& cfg, std::string moduleLabel)
+  binningEntryType(const edm::ParameterSet& cfg, const std::string& moduleLabel)
   : binSelection_(new StringCutObjectSelector<reco::Candidate>(cfg.getParameter<std::string>("binSelection"))),
       binUncertainty_(cfg.getParameter<std::string>("binUncertainty")),
       energyDep_(false)
     {
-      binUncFormula_ = std::make_unique<TF2>(std::string(moduleLabel).append("_uncFormula").c_str(), binUncertainty_.c_str() );
+      binUncFormula_ = std::make_unique<reco::FormulaEvaluator>(binUncertainty_);
       if(cfg.exists("energyDependency") ) {energyDep_=cfg.getParameter<bool>("energyDependency");
       }
     }
@@ -73,7 +72,7 @@ class ShiftedParticleProducer : public edm::stream::EDProducer<>
     std::unique_ptr<StringCutObjectSelector<reco::Candidate> > binSelection_;
     //double binUncertainty_;
     std::string binUncertainty_;
-    std::unique_ptr<TF2> binUncFormula_;
+    std::unique_ptr<reco::FormulaEvaluator> binUncFormula_;
     bool energyDep_;
   };
   std::vector<binningEntryType*> binning_;

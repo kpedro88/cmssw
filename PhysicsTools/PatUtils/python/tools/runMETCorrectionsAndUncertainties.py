@@ -1006,21 +1006,21 @@ class RunMETCorrectionsAndUncertainties(ConfigToolBase):
         if identifier == "Electron":
             shiftedModuleUp = cms.EDProducer("ShiftedParticleProducer",
                                              src = objectCollection,
-                                             uncertainty = cms.string('((abs(y)<1.479)?(0.006+0*x):(0.015+0*x))'),
+                                             uncertainty = cms.string('((abs(y)<1.479)*(0.006+0*x)+(abs(y)>=1.479)*(0.015+0*x))'),
                                              shiftBy = cms.double(+1.*varyByNsigmas)
                                              )
 
         if identifier == "Photon":
             shiftedModuleUp = cms.EDProducer("ShiftedParticleProducer",
                                              src = objectCollection,
-                                             uncertainty = cms.string('((abs(y)<1.479)?(0.01+0*x):(0.025+0*x))'),
+                                             uncertainty = cms.string('((abs(y)<1.479)*(0.01+0*x)+(abs(y)>=1.479)*(0.025+0*x))'),
                                              shiftBy = cms.double(+1.*varyByNsigmas)
                                              )
 
         if identifier == "Muon":
             shiftedModuleUp = cms.EDProducer("ShiftedParticleProducer",
                                              src = objectCollection,
-                                             uncertainty = cms.string('((x<100)?(0.002+0*y):(0.05+0*y))'),
+                                             uncertainty = cms.string('((x<100)*(0.002+0*y)+(x>=100)*(0.05+0*y))'),
                                              shiftBy = cms.double(+1.*varyByNsigmas)
                                              )
 
@@ -1044,7 +1044,7 @@ class RunMETCorrectionsAndUncertainties(ConfigToolBase):
                     cms.PSet(
                         binSelection = cms.string('pdgId==130'),
                         energyDependency = cms.bool(True),
-                        binUncertainty = cms.string('((abs(y)<1.3)?(min(0.25,sqrt(0.64/x+0.0025))):(min(0.30,sqrt(1.0/x+0.0016))))')
+                        binUncertainty = cms.string('((abs(y)<1.3)*(min(0.25,sqrt(0.64/x+0.0025)))+(abs(y)>=1.3)*(min(0.30,sqrt(1.0/x+0.0016))))')
                         ),
                     # photon - ECAL resolution
                     cms.PSet(

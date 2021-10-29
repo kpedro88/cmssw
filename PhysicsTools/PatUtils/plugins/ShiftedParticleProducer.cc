@@ -59,17 +59,17 @@ ShiftedParticleProducer::produce(edm::Event& evt, const edm::EventSetup& es)
 
 double 
 ShiftedParticleProducer::getUncShift(const edm::View<reco::Candidate>::const_iterator& originalParticle) {
-  double valx=0;
-  double valy=0;
   for(std::vector<binningEntryType*>::iterator binningEntry=binning_.begin();
       binningEntry!=binning_.end(); ++binningEntry ) {
     if( (!(*binningEntry)->binSelection_) || (*(*binningEntry)->binSelection_)(*originalParticle) ) {
+      std::vector<double> empty;
+      std::vector<double> vals(2);
 
-      if( (*binningEntry)->energyDep_ ) valx=originalParticle->energy();
-      else valx=originalParticle->pt();
+      if( (*binningEntry)->energyDep_ ) vals[0]=originalParticle->energy();
+      else vals[0]=originalParticle->pt();
 
-      valy=originalParticle->eta();
-      return (*binningEntry)->binUncFormula_->Eval(valx, valy);
+      vals[1]=originalParticle->eta();
+      return (*binningEntry)->binUncFormula_->evaluate(vals,empty);
     }
   }
   return 0;

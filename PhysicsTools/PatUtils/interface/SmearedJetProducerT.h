@@ -26,6 +26,8 @@
 #include "DataFormats/JetReco/interface/GenJet.h"
 #include "DataFormats/JetReco/interface/GenJetCollection.h"
 #include "DataFormats/Math/interface/deltaR.h"
+#include "DataFormats/Common/interface/ValueMap.h"
+#include "DataFormats/PatCandidates/interface/Jet.h"
 
 #include "JetMETCorrections/Modules/interface/JetResolution.h"
 
@@ -100,6 +102,7 @@ class SmearedJetProducerT : public edm::stream::EDProducer<> {
 public:
   explicit SmearedJetProducerT(const edm::ParameterSet& cfg)
       : m_enabled(cfg.getParameter<bool>("enabled")),
+        m_store_factor(cfg.getParameter<unsigned>("store_factor")),
         m_useDeterministicSeed(cfg.getParameter<bool>("useDeterministicSeed")),
         m_debug(cfg.getUntrackedParameter<bool>("debug", false)) {
     m_jets_token = consumes<JetCollection>(cfg.getParameter<edm::InputTag>("src"));
@@ -147,6 +150,7 @@ public:
                              "Invalid value for 'variation' parameter. Only -1, 0, 1 or 101, -101 are supported.");
     }
 
+    if(m_store_factor==1) produces<edm::ValueMap<float>>();
     produces<JetCollection>();
   }
 
@@ -155,6 +159,7 @@ public:
 
     desc.add<edm::InputTag>("src");
     desc.add<bool>("enabled");
+    desc.add<unsigned>("store_factor",0);
     desc.add<edm::InputTag>("rho");
     desc.add<std::int32_t>("variation", 0);
     desc.add<std::string>("uncertaintySource", "");
@@ -173,6 +178,10 @@ public:
 
     descriptions.addDefault(desc);
   }
+
+  // only implemented for pat::Jet specialization
+  void setOrigIndex(T& jet, int idx) {}
+  void setFactor(T& jet, double fac) {}
 
   void produce(edm::Event& event, const edm::EventSetup& setup) override {
     edm::Handle<JetCollection> jets_collection;
@@ -216,11 +225,29 @@ public:
       m_genJetMatcher->getTokens(event);
 
     auto smearedJets = std::make_unique<JetCollection>();
+    smearedJets->reserve(jets.size());
+    auto jerUncVec  = std::make_unique<std::vector<double>>();
+    if(m_store_factor==1){
+        jerUncVec->reserve(jets.size());
+    }
 
+    int idx = 0;
     for (const auto& jet : jets) {
+      T smearedJet = jet;
+      setOrigIndex(smearedJet, idx);
+      ++idx;
+
+      double smearFactor = 1.;
+
       if ((!m_enabled) || (jet.pt() == 0)) {
         // Module disabled or invalid p4. Simply copy the input jet.
-        smearedJets->push_back(jet);
+        if(m_store_factor==1){
+          jerUncVec->push_back(smearFactor);
+        }
+        else if(m_store_factor==2){
+          setFactor(smearedJet,smearFactor);
+        }
+        smearedJets->push_back(smearedJet);
 
         continue;
       }
@@ -240,8 +267,6 @@ public:
       const reco::GenJet* genJet = nullptr;
       if (m_genJetMatcher)
         genJet = m_genJetMatcher->match(jet, jet.pt() * jet_resolution);
-
-      double smearFactor = 1.;
 
       if (genJet) {
         /*
@@ -284,7 +309,13 @@ public:
         smearFactor = newSmearFactor;
       }
 
-      T smearedJet = jet;
+      if(m_store_factor==1){
+        jerUncVec->push_back(smearFactor);
+      }
+      else if(m_store_factor==2){
+        setFactor(smearedJet,smearFactor);
+      }
+
       smearedJet.scaleEnergy(smearFactor);
 
       if (m_debug) {
@@ -293,6 +324,15 @@ public:
       }
 
       smearedJets->push_back(smearedJet);
+    }
+
+    if(m_store_factor==1){
+      //store uncertainty as a userfloat, keyed to original collection
+      auto out = std::make_unique<edm::ValueMap<float>>();
+      typename edm::ValueMap<float>::Filler filler(*out);
+      filler.insert(jets_collection, jerUncVec->begin(), jerUncVec->end());
+      filler.fill();
+      event.put(std::move(out),"");
     }
 
     // Sort jets by pt
@@ -307,6 +347,7 @@ private:
   edm::EDGetTokenT<JetCollection> m_jets_token;
   edm::EDGetTokenT<double> m_rho_token;
   bool m_enabled;
+  unsigned m_store_factor;
   std::string m_jets_algo_pt;
   std::string m_jets_algo;
   Variation m_systematic_variation;
@@ -325,4 +366,15 @@ private:
 
   int m_nomVar;
 };
+
+// only implemented for pat::Jet specialization
+template <>
+void SmearedJetProducerT<pat::Jet>::setOrigIndex(pat::Jet& jet, int idx) {
+    jet.addUserInt("jerOrigIndex",idx);
+}
+template <>
+void SmearedJetProducerT<pat::Jet>::setFactor(pat::Jet& jet, double fac) {
+    jet.addUserFloat("jerFactor",fac);
+}
+
 #endif

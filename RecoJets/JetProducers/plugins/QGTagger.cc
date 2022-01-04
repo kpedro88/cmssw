@@ -37,6 +37,7 @@ QGTagger::QGTagger(const edm::ParameterSet& iConfig) :
   produceSyst(							systLabel != "")
 {
   produces<edm::ValueMap<float>>("qgLikelihood");
+  produces<edm::ValueMap<float>>("axis1");
   produces<edm::ValueMap<float>>("axis2");
   produces<edm::ValueMap<int>>("mult");
   produces<edm::ValueMap<float>>("ptD");
@@ -52,6 +53,7 @@ QGTagger::QGTagger(const edm::ParameterSet& iConfig) :
 /// Produce qgLikelihood using {mult, ptD, -log(axis2)}
 void QGTagger::produce(edm::StreamID, edm::Event& iEvent, const edm::EventSetup& iSetup) const {
   std::vector<float>* qgProduct 		= new std::vector<float>;
+  std::vector<float>* axis1Product 		= new std::vector<float>;
   std::vector<float>* axis2Product 		= new std::vector<float>;
   std::vector<int>*   multProduct 		= new std::vector<int>;
   std::vector<float>* ptDProduct 		= new std::vector<float>;
@@ -83,8 +85,8 @@ void QGTagger::produce(edm::StreamID, edm::Event& iEvent, const edm::EventSetup&
     }
     float pt = (useJetCorr ? jet->pt()*jetCorr->correction(*jet) : jet->pt());
 
-    float ptD, axis2; int mult;
-    std::tie(mult, ptD, axis2) = calcVariables(&*jet, vertexCollection, weAreUsingPackedCandidates);
+    float ptD, axis1, axis2; int mult;
+    std::tie(mult, ptD, axis1, axis2) = calcVariables(&*jet, vertexCollection, weAreUsingPackedCandidates);
 
     float qgValue;
     if(mult > 2) qgValue = qgLikelihood->computeQGLikelihood(QGLParamsColl, pt, jet->eta(), *rho, {(float) mult, ptD, -std::log(axis2)});
@@ -96,12 +98,14 @@ void QGTagger::produce(edm::StreamID, edm::Event& iEvent, const edm::EventSetup&
       smearedGluonProduct->push_back(qgLikelihood->systematicSmearing(QGLSystColl, pt, jet->eta(), *rho, qgValue, 1));
       smearedAllProduct->push_back(qgLikelihood->systematicSmearing(  QGLSystColl, pt, jet->eta(), *rho, qgValue, 2));
     }
+    axis1Product->push_back(axis1);
     axis2Product->push_back(axis2);
     multProduct->push_back(mult);
     ptDProduct->push_back(ptD);
   }
 
   putInEvent("qgLikelihood", jets, qgProduct,    iEvent);
+  putInEvent("axis1",        jets, axis1Product, iEvent);
   putInEvent("axis2",        jets, axis2Product, iEvent);
   putInEvent("mult",         jets, multProduct,  iEvent);
   putInEvent("ptD",          jets, ptDProduct,   iEvent);
@@ -134,8 +138,8 @@ bool QGTagger::isPackedCandidate(const reco::Jet* jet) const {
 }
 
 
-/// Calculation of axis2, mult and ptD
-std::tuple<int, float, float> QGTagger::calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC, bool weAreUsingPackedCandidates) const {
+/// Calculation of axis1, axis2, mult and ptD
+std::tuple<int, float, float, float> QGTagger::calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC, bool weAreUsingPackedCandidates) const {
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
   int mult = 0;
 
@@ -207,9 +211,10 @@ std::tuple<int, float, float> QGTagger::calcVariables(const reco::Jet *jet, edm:
     c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi);                
   }
   float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
+  float axis1 = (a+b+delta > 0 ?  sqrt(0.5*(a+b+delta)) : 0);
   float axis2 = (a+b-delta > 0 ?  sqrt(0.5*(a+b-delta)) : 0);
   float ptD   = (sum_weight > 0 ? sqrt(sum_weight)/sum_pt : 0);
-  return std::make_tuple(mult, ptD, axis2);
+  return std::make_tuple(mult, ptD, axis1, axis2);
 }
 
 

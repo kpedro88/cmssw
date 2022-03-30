@@ -223,7 +223,7 @@ void TritonService::preBeginJob(edm::PathsAndConsumesOfModulesBase const&, edm::
   }
 
   //assemble server start command
-  std::string command("cmsTriton -P -1 -p " + pid_);
+  std::string command("cmsTriton -P " + std::to_string(fallbackOpts_.port) + " -p " + pid_);
   if (fallbackOpts_.debug)
     command += " -c";
   if (fallbackOpts_.verbose)
@@ -308,6 +308,7 @@ void TritonService::fillDescriptions(edm::ConfigurationDescriptions& description
   fallbackDesc.addUntracked<bool>("useGPU", false);
   fallbackDesc.addUntracked<int>("retries", -1);
   fallbackDesc.addUntracked<int>("wait", -1);
+  fallbackDesc.addUntracked<int>("port", -1);
   fallbackDesc.addUntracked<std::string>("instanceName", "");
   fallbackDesc.addUntracked<std::string>("tempDir", "");
   fallbackDesc.addUntracked<std::string>("imageName", "");

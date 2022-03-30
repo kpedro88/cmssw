@@ -35,6 +35,7 @@ public:
           useGPU(pset.getUntrackedParameter<bool>("useGPU")),
           retries(pset.getUntrackedParameter<int>("retries")),
           wait(pset.getUntrackedParameter<int>("wait")),
+          port(pset.getUntrackedParameter<int>("port")),
           instanceName(pset.getUntrackedParameter<std::string>("instanceName")),
           tempDir(pset.getUntrackedParameter<std::string>("tempDir")),
           imageName(pset.getUntrackedParameter<std::string>("imageName")),
@@ -47,6 +48,7 @@ public:
     bool useGPU;
     int retries;
     int wait;
+    int port;
     std::string instanceName;
     std::string tempDir;
     std::string imageName;

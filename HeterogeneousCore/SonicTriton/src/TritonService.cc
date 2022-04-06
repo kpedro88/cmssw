@@ -273,16 +273,19 @@ void TritonService::preBeginJob(edm::PathsAndConsumesOfModulesBase const&, edm::
     throw cms::Exception("FallbackFailed") << "Starting the fallback server failed with exit code " << rv;
 
   //get the port
-  const std::string& portIndicator("CMS_TRITON_GRPC_PORT: ");
-  //find last instance in log in case multiple ports were tried
-  auto pos = output.rfind(portIndicator);
-  if (pos != std::string::npos) {
-    auto pos2 = pos + portIndicator.size();
-    auto pos3 = output.find('\n', pos2);
-    const auto& portNum = output.substr(pos2, pos3 - pos2);
-    server.url += ":" + portNum;
+  if (fallbackOpts_.port==-1) {
+    const std::string& portIndicator("CMS_TRITON_GRPC_PORT: ");
+    //find last instance in log in case multiple ports were tried
+    auto pos = output.rfind(portIndicator);
+    if (pos != std::string::npos) {
+      auto pos2 = pos + portIndicator.size();
+      auto pos3 = output.find('\n', pos2);
+      const auto& portNum = output.substr(pos2, pos3 - pos2);
+      server.url += ":" + portNum;
+    } else
+      throw cms::Exception("FallbackFailed") << "Unknown port for fallback server, log follows:\n" << output;
   } else
-    throw cms::Exception("FallbackFailed") << "Unknown port for fallback server, log follows:\n" << output;
+    server.url += ":" + std::to_string(fallbackOpts_.port+1); //grpc port is 1 after base (http) port
 }
 
 void TritonService::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {

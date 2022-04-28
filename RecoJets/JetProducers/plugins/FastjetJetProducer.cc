@@ -113,7 +113,6 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 	gridMaxRapidity_ = iConfig.getParameter<double>("gridMaxRapidity");
 	gridSpacing_ = iConfig.getParameter<double>("gridSpacing");
 
-	savePseudoJets_ = iConfig.getParameter<bool>("savePseudoJets");
 	usePseudoJets_ = iConfig.getParameter<bool>("usePseudoJets");
 
 	input_chrefcand_token_ = consumes<edm::View<reco::RecoChargedRefCandidate> >(iConfig.getParameter<edm::InputTag>("src"));
@@ -166,10 +165,6 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 	if ( ( correctShape_ ) && ( ( gridMaxRapidity_ == -1 ) || ( gridSpacing_ == -1 )) ) 
 		throw cms::Exception("correctShape") << "Parameters gridMaxRapidity and/or gridSpacing for SoftDrop are not defined." << std::endl;
 
-	//an extra product
-	if ( savePseudoJets_ )
-		produces<std::vector<fastjet::PseudoJet>>();
-
 	//an extra consume
 	if ( usePseudoJets_ )
 		pseudojet_token_ = consumes<std::vector<fastjet::PseudoJet>>(iConfig.getParameter<edm::InputTag>("srcPseudoJets"));
@@ -199,11 +194,6 @@ void FastjetJetProducer::produce( edm::Event & iEvent, const edm::EventSetup & i
 
     produceTrackJets(iEvent, iSetup);
   
-  }
-
-  if ( savePseudoJets_ ) {
-    auto pseudoJets = std::make_unique<std::vector<fastjet::PseudoJet>>(fjJets_);
-    iEvent.put(std::move(pseudoJets));
   }
 
   // fjClusterSeq_ retains quite a lot of memory - about 1 to 7Mb at 200 pileup
@@ -389,6 +379,11 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
 
     std::vector<fastjet::PseudoJet> tempJets = usePseudoJets_ ? *(pseudoJetHandle.product()) : fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
 
+	if ( usePseudoJets_) {
+		if(tempJets.empty()) std::cout << "usePseudoJets: empty" << std::endl;
+		else std::cout << "usePseudoJets: " << tempJets.size() << " jets, " << tempJets[0].structure_ptr() << " structure ptr, " << tempJets[0].has_pieces() << " " << tempJets[0].has_constituents() << std::endl;
+	}
+
     unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
     if ( useConstituentSubtraction_ ) {
       fastjet::Selector rho_range =  fastjet::SelectorAbsRapMax(csRho_EtaMax_);
@@ -484,7 +479,6 @@ void FastjetJetProducer::fillDescriptions(edm::ConfigurationDescriptions& descri
         ////
 	descFastjetJetProducer.add<string>("jetCollInstanceName", ""	);
 	descFastjetJetProducer.add<bool> ("sumRecHits", false);
-	descFastjetJetProducer.add<bool> ("savePseudoJets", false);
 	descFastjetJetProducer.add<bool> ("usePseudoJets", false);
 	descFastjetJetProducer.add<edm::InputTag> ("srcPseudoJets", edm::InputTag(""));
 

@@ -159,6 +159,7 @@ VirtualJetProducer::VirtualJetProducer(const edm::ParameterSet& iConfig) {
 	useDeterministicSeed_ 	= iConfig.getParameter<bool>	("useDeterministicSeed");
 	minSeed_ 		= iConfig.getParameter<unsigned int>("minSeed");
 	verbosity_ 		= iConfig.getParameter<int>	("verbosity");
+	savePseudoJets_ = iConfig.getParameter<bool>("savePseudoJets");
 
 	anomalousTowerDef_ = unique_ptr<AnomalousTower>(new AnomalousTower(iConfig));
 
@@ -250,7 +251,9 @@ VirtualJetProducer::VirtualJetProducer(const edm::ParameterSet& iConfig) {
 	produces<double>("rho");
 	produces<double>("sigma");
 
-  
+	//an extra product
+	if ( savePseudoJets_ )
+		produces<std::vector<fastjet::PseudoJet>>();
 }
 
 //______________________________________________________________________________
@@ -430,6 +433,11 @@ void VirtualJetProducer::produce(edm::Event& iEvent,const edm::EventSetup& iSetu
   // this will use inputs_
   output( iEvent, iSetup );
   LogDebug("VirtualJetProducer") << "Wrote jets\n";
+
+  if ( savePseudoJets_ ) {
+    auto pseudoJets = std::make_unique<std::vector<fastjet::PseudoJet>>(fjJets_);
+    iEvent.put(std::move(pseudoJets));
+  }
   
   // Clear the work vectors so that memory is free for other modules.
   // Use the trick of swapping with an empty vector so that the memory
@@ -1044,4 +1052,5 @@ void VirtualJetProducer::fillDescriptionsFromVirtualJetProducer(edm::ParameterSe
 	desc.add<unsigned int>("maxRecoveredHcalCells",	9999999 );
 	vector<double>  puCentersDefault;
 	desc.add<vector<double>>("puCenters", 	puCentersDefault);
+	desc.add<bool> ("savePseudoJets", false);
 }

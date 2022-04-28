@@ -1,0 +1,4 @@
+<lcgdict>
+  <class name="fastjet::PseudoJet" persistent="false"/>
+  <class name="std::vector<fastjet::PseudoJet>" persistent="false"/>
+</lcgdict>

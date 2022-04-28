@@ -16,6 +16,7 @@
 <use name="fastjet"/>
 <use name="vdt_headers"/>
 <use name="boost_serialization"/>
+<use name="rootcore"/>
 <export>
   <lib name="1"/>
 </export>

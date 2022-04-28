@@ -251,9 +251,11 @@ VirtualJetProducer::VirtualJetProducer(const edm::ParameterSet& iConfig) {
 	produces<double>("rho");
 	produces<double>("sigma");
 
-	//an extra product
-	if ( savePseudoJets_ )
+	//some extra products
+	if ( savePseudoJets_ ) {
 		produces<std::vector<fastjet::PseudoJet>>();
+		produces<fastjet::ClusterSequence>();
+	}
 }
 
 //______________________________________________________________________________
@@ -437,6 +439,8 @@ void VirtualJetProducer::produce(edm::Event& iEvent,const edm::EventSetup& iSetu
   if ( savePseudoJets_ ) {
     auto pseudoJets = std::make_unique<std::vector<fastjet::PseudoJet>>(fjJets_);
     iEvent.put(std::move(pseudoJets));
+    auto clusterSeq = std::make_unique<fastjet::ClusterSequence>(*fjClusterSeq_);
+    iEvent.put(std::move(clusterSeq));
   }
   
   // Clear the work vectors so that memory is free for other modules.

@@ -491,6 +491,7 @@ void FastjetJetProducer::fillDescriptions(edm::ConfigurationDescriptions& descri
   descFastjetJetProducer.add<bool>("sumRecHits", false);
   descFastjetJetProducer.add<bool> ("savePseudoJets", false);
   descFastjetJetProducer.add<bool> ("usePseudoJets", false);
+  descFastjetJetProducer.add<edm::InputTag> ("srcPseudoJets", edm::InputTag(""));
 
   /////////////////////
   descriptions.add("FastjetJetProducer", descFastjetJetProducer);

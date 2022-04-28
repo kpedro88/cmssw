@@ -106,6 +106,7 @@ protected:
   double gridSpacing_;        /// for shape subtraction, get the grid spacing
   bool usePseudoJets_;
   edm::EDGetTokenT<std::vector<fastjet::PseudoJet>> pseudojet_token_;
+  edm::EDGetTokenT<fastjet::ClusterSequence> clusterseq_token_;
 
   double subjetPtMin_;        /// for CMSBoostedTauSeedingAlgorithm : subjet pt min
   double muMin_;              /// for CMSBoostedTauSeedingAlgorithm : min mass-drop

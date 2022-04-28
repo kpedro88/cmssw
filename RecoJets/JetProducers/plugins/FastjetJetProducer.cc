@@ -108,6 +108,9 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig) : Virtu
   gridMaxRapidity_ = iConfig.getParameter<double>("gridMaxRapidity");
   gridSpacing_ = iConfig.getParameter<double>("gridSpacing");
 
+  savePseudoJets_ = iConfig.getParameter<bool>("savePseudoJets");
+  usePseudoJets_ = iConfig.getParameter<bool>("usePseudoJets");
+
   input_chrefcand_token_ =
       consumes<edm::View<reco::RecoChargedRefCandidate>>(iConfig.getParameter<edm::InputTag>("src"));
 
@@ -163,6 +166,14 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig) : Virtu
   if ((correctShape_) && ((gridMaxRapidity_ == -1) || (gridSpacing_ == -1)))
     throw cms::Exception("correctShape")
         << "Parameters gridMaxRapidity and/or gridSpacing for SoftDrop are not defined." << std::endl;
+
+  //an extra product
+  if ( savePseudoJets_ )
+    produces<std::vector<fastjet::PseudoJet>>();
+
+  //an extra consume
+  if ( usePseudoJets_ )
+    pseudojet_token_ = consumes<std::vector<fastjet::PseudoJet>>(iConfig.getParameter<edm::InputTag>("srcPseudoJets"));
 }
 
 //______________________________________________________________________________
@@ -181,6 +192,11 @@ void FastjetJetProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   } else {  // produce trackjets from tracks grouped per primary vertex
 
     produceTrackJets(iEvent, iSetup);
+  }
+
+  if ( savePseudoJets_ ) {
+    auto pseudoJets = std::make_unique<std::vector<fastjet::PseudoJet>>(fjJets_);
+    iEvent.put(std::move(pseudoJets));
   }
 
   // fjClusterSeq_ retains quite a lot of memory - about 1 to 7Mb at 200 pileup
@@ -352,7 +368,10 @@ void FastjetJetProducer::runAlgorithm(edm::Event& iEvent, edm::EventSetup const&
   fin.close();
   */
 
-  if (!doAreaFastjet_ && !doRhoFastjet_) {
+  edm::Handle<std::vector<fastjet::PseudoJet>> pseudoJetHandle;
+  if ( usePseudoJets_ ) {
+    iEvent.getByToken(pseudojet_token_, pseudoJetHandle);
+  } else if (!doAreaFastjet_ && !doRhoFastjet_) {
     fjClusterSeq_ = std::make_shared<fastjet::ClusterSequence>(fjInputs_, *fjJetDefinition_);
   } else if (voronoiRfact_ <= 0) {
     fjClusterSeq_ =
@@ -364,13 +383,13 @@ void FastjetJetProducer::runAlgorithm(edm::Event& iEvent, edm::EventSetup const&
 
   if (!(useMassDropTagger_ || useCMSBoostedTauSeedingAlgorithm_ || useTrimming_ || useFiltering_ || usePruning_ ||
         useSoftDrop_ || useConstituentSubtraction_)) {
-    fjJets_ = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
+    fjJets_ = usePseudoJets_ ? *(pseudoJetHandle.product()) : fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
   } else {
     fjJets_.clear();
 
     transformer_coll transformers;
 
-    std::vector<fastjet::PseudoJet> tempJets = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
+    std::vector<fastjet::PseudoJet> tempJets = usePseudoJets_ ? *(pseudoJetHandle.product()) : fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
 
     unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
     if (useConstituentSubtraction_) {
@@ -470,6 +489,8 @@ void FastjetJetProducer::fillDescriptions(edm::ConfigurationDescriptions& descri
   ////
   descFastjetJetProducer.add<string>("jetCollInstanceName", "");
   descFastjetJetProducer.add<bool>("sumRecHits", false);
+  descFastjetJetProducer.add<bool> ("savePseudoJets", false);
+  descFastjetJetProducer.add<bool> ("usePseudoJets", false);
 
   /////////////////////
   descriptions.add("FastjetJetProducer", descFastjetJetProducer);

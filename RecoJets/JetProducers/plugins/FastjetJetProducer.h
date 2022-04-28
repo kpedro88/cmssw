@@ -100,6 +100,9 @@ private:
   double R0_;        /// for soft drop : R0 (angular distance normalization - should be set to jet radius in most cases)
   double gridMaxRapidity_;  /// for shape subtraction, get the fixed-grid rho
   double gridSpacing_;      /// for shape subtraction, get the grid spacing
+  bool savePseudoJets_;
+  bool usePseudoJets_;
+  edm::EDGetTokenT<std::vector<fastjet::PseudoJet>> pseudojet_token_;
 
   double subjetPtMin_;  /// for CMSBoostedTauSeedingAlgorithm : subjet pt min
   double muMin_;        /// for CMSBoostedTauSeedingAlgorithm : min mass-drop

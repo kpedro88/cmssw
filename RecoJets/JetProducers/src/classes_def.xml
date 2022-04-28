@@ -1,4 +1,5 @@
 <lcgdict>
   <class name="fastjet::PseudoJet" persistent="false"/>
   <class name="std::vector<fastjet::PseudoJet>" persistent="false"/>
+  <class name="edm::Wrapper<std::vector<fastjet::PseudoJet> >" persistent="false"/>
 </lcgdict>

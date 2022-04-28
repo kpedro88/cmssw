@@ -15,6 +15,7 @@
 <use   name="vdt_headers"/>
 <use   name="boost_serialization"/>
 <use   name="CondFormats/DataRecord"/>
+<use   name="rootcore"/>
 <export>
   <lib   name="1"/>
 </export>

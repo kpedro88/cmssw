@@ -53,10 +53,15 @@ using namespace std;
 using namespace edm;
 
 namespace {
-	void recombinePseudoJetClusterSeq(std::vector<fastjet::PseudoJet>& pseudoJets, const fastjet::ClusterSequence* clusterSeq) {
+	void recombinePseudoJetClusterSeq(std::vector<fastjet::PseudoJet>& pseudoJets, const fastjet::ClusterSequence* clusterSeq, double jetPtMin) {
+		unsigned counter = 0;
 		for(auto& jet : pseudoJets){
+			if(jet.pt() < jetPtMin) break;
 			static_cast<fastjet::ClusterSequenceStructure*>(jet.structure_non_const_ptr())->set_associated_cs(clusterSeq);
+			++counter;
 		}
+		//grooming algos may have different jetPtMin than original clustering, so truncate the pseudojet list to match
+		pseudoJets.resize(counter);
 	}
 }
 
@@ -380,7 +385,7 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
 
   if ( !(useMassDropTagger_ || useCMSBoostedTauSeedingAlgorithm_ || useTrimming_ || useFiltering_ || usePruning_ || useSoftDrop_ || useConstituentSubtraction_ ) ) {
     fjJets_ = usePseudoJets_ ? *(pseudoJetHandle.product()) : fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
-    if ( usePseudoJets_ ) recombinePseudoJetClusterSeq(fjJets_, clusterSeqHandle.product());
+    if ( usePseudoJets_ ) recombinePseudoJetClusterSeq(fjJets_, clusterSeqHandle.product(), jetPtMin_);
   } else {
     fjJets_.clear();
 
@@ -389,7 +394,7 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
 
 
     std::vector<fastjet::PseudoJet> tempJets = usePseudoJets_ ? *(pseudoJetHandle.product()) : fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
-    if ( usePseudoJets_ ) recombinePseudoJetClusterSeq(tempJets, clusterSeqHandle.product());
+    if ( usePseudoJets_ ) recombinePseudoJetClusterSeq(tempJets, clusterSeqHandle.product(), jetPtMin_);
 
     unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
     if ( useConstituentSubtraction_ ) {

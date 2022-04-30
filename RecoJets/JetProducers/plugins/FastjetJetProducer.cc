@@ -69,6 +69,16 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 	minVtxNdof_ = iConfig.getParameter<int>("MinVtxNdof");
 	maxVtxZ_ = iConfig.getParameter<double>("MaxVtxZ");
 
+	oneShotTransform_ = iConfig.getParameter<bool>("oneShotTransform");
+	jetPtMinTransform_ = iConfig.getParameter<double>("jetPtMinTransform");
+	jetTransformName_ = iConfig.getParameter<string>("jetTransformName");
+	jetTransformCollName_ = iConfig.getParameter<string>("jetTransformCollName");
+
+	if(oneShotTransform_){
+		//extra produces for transform output: always compound, never withConst
+		makeProduces(moduleLabel_, jetTransformCollName_, jetTransformName_, true, false);
+	}
+
 	useMassDropTagger_ = iConfig.getParameter<bool>("useMassDropTagger");
 	muCut_ = iConfig.getParameter<double>("muCut");
 	yCut_ = iConfig.getParameter<double>("yCut");
@@ -360,16 +370,25 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
     fjClusterSeq_ = ClusterSequencePtr( new fastjet::ClusterSequenceVoronoiArea( fjInputs_, *fjJetDefinition_ , fastjet::VoronoiAreaSpec(voronoiRfact_) ) );
   }
 
-  if ( !(useMassDropTagger_ || useCMSBoostedTauSeedingAlgorithm_ || useTrimming_ || useFiltering_ || usePruning_ || useSoftDrop_ || useConstituentSubtraction_ ) ) {
+  bool doTransform = useMassDropTagger_ || useCMSBoostedTauSeedingAlgorithm_ || useTrimming_ || useFiltering_ || usePruning_ || useSoftDrop_ || useConstituentSubtraction_;
+  if ( oneShotTransform_ or !doTransform ) {
     fjJets_ = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
-  } else {
-    fjJets_.clear();
+  }
+  if (doTransform) {
 
-
+    std::vector<fastjet::PseudoJet> tempJets;
     transformer_coll transformers;
 
-
-    std::vector<fastjet::PseudoJet> tempJets = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
+    if(oneShotTransform_) {
+      tempJets = fjJets_;
+      //apply different jetPtMin
+      auto itJets = std::lower_bound(tempJets.rbegin(), tempJets.rend(), jetPtMinTransform_*jetPtMinTransform_, [](const fastjet::PseudoJet& jet, double min){ return jet.pt2() >= min; });
+      tempJets.resize(std::distance(tempJets.rbegin(), itJets));
+    }
+    else {
+      fjJets_.clear();
+      tempJets = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
+    }
 
     unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
     if ( useConstituentSubtraction_ ) {
@@ -428,7 +447,7 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
       //subtractor->use_common_bge_for_rho_and_rhom(true);
     }
 
-
+    std::vector<fastjet::PseudoJet> fjJets; //for one-shot case
     for ( std::vector<fastjet::PseudoJet>::const_iterator ijet = tempJets.begin(),
 	    ijetEnd = tempJets.end(); ijet != ijetEnd; ++ijet ) {
 
@@ -448,9 +467,14 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
       }
 
       if ( passed ) {
-	fjJets_.push_back( transformedJet );
+        if ( oneShotTransform_) fjJets.push_back( transformedJet );
+        else fjJets_.push_back( transformedJet );
       }
     }
+
+    if(oneShotTransform_)
+      //extra output call: writeCompound always true
+      output(iEvent, iSetup, fjJets, inputs_, jetTransformName_, jetTransformCollName_, true);
   }
 
 }
@@ -466,6 +490,10 @@ void FastjetJetProducer::fillDescriptions(edm::ConfigurationDescriptions& descri
         ////
 	descFastjetJetProducer.add<string>("jetCollInstanceName", ""	);
 	descFastjetJetProducer.add<bool> ("sumRecHits", false);
+	descFastjetJetProducer.add<bool> ("oneShotTransform", false);
+	descFastjetJetProducer.add<double> ("jetPtMinTransform", 0.);
+	descFastjetJetProducer.add<std::string> ("jetTransformName", "");
+	descFastjetJetProducer.add<std::string> ("jetTransformCollName", "");
 
 	/////////////////////
 	descriptions.add("FastjetJetProducer",descFastjetJetProducer);

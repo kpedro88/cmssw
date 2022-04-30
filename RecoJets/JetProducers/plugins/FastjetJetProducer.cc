@@ -382,8 +382,8 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
     if(oneShotTransform_) {
       tempJets = fjJets_;
       //apply different jetPtMin
-      auto itJets = std::lower_bound(tempJets.rbegin(), tempJets.rend(), jetPtMinTransform_*jetPtMinTransform_, [](const fastjet::PseudoJet& jet, double min){ return jet.pt2() >= min; });
-      tempJets.resize(std::distance(tempJets.rbegin(), itJets));
+      auto itJets = std::lower_bound(tempJets.rbegin(), tempJets.rend(), jetPtMinTransform_*jetPtMinTransform_, [](const fastjet::PseudoJet& jet, double min){ return jet.pt2() < min; });
+      tempJets.resize(std::distance(itJets, tempJets.rend()));
     }
     else {
       fjJets_.clear();

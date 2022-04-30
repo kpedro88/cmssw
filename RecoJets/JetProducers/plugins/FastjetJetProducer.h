@@ -78,6 +78,12 @@ protected:
   int minVtxNdof_;
   float maxVtxZ_;
 
+  // new parameters
+  bool oneShotTransform_;    /// one-shot mode: central clustering and transforms (grooming) done together
+  double jetPtMinTransform_;                  // minimum jet pt for transform (may be different from central)
+  std::string jetTransformName_;              // name for transform output (to distinguish from central)
+  std::string jetTransformCollName_;          // name for transform output subjets (to distinguish from central)
+
   // jet trimming parameters
   bool useMassDropTagger_;    /// Mass-drop tagging for boosted Higgs
   bool useFiltering_;         /// Jet filtering technique

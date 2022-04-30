@@ -111,6 +111,7 @@ protected:
   // The default is to produce a single jet collection as per the user's request
   // (Calo,PF,Basic, or Gen). 
   virtual void makeProduces( std::string s, std::string tag = "" );
+  virtual void makeProduces( std::string alias, std::string tag, std::string name, bool writeCompound, bool writeJetsWithConst );
 
   // This method inputs the constituents from "inputs" and modifies
   // fjInputs. 
@@ -145,14 +146,16 @@ protected:
   // Note: The "output" method is virtual and can be overriden.
   // The default behavior is to call the function template "writeJets". 
   virtual void output(  edm::Event & iEvent, edm::EventSetup const& iSetup );
+  virtual void output(edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName, bool writeCompound);
+
   template< typename T >
-  void writeJets( edm::Event & iEvent, edm::EventSetup const& iSetup );
+  void writeJets( edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName  );
   
   template< typename T>
-  void writeCompoundJets(  edm::Event & iEvent, edm::EventSetup const& iSetup);
+  void writeCompoundJets(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName );
 
   template< typename T>
-    void writeJetsWithConstituents(  edm::Event & iEvent, edm::EventSetup const& iSetup);
+    void writeJetsWithConstituents(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName );
 
   // This method copies the constituents from the fjConstituents method
   // to an output of CandidatePtr's. 

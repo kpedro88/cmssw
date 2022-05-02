@@ -537,10 +537,10 @@ VirtualJetProducer::getConstituents(const vector<fastjet::PseudoJet>&fjConstitue
 
 void VirtualJetProducer::output(edm::Event & iEvent, edm::EventSetup const& iSetup)
 {
-  output(iEvent, iSetup, fjJets_, inputs_, "", jetCollInstanceName_, writeCompound_);
+  output(iEvent, iSetup, fjJets_, "", jetCollInstanceName_, writeCompound_);
 }
 
-void VirtualJetProducer::output(edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName, bool writeCompound)
+void VirtualJetProducer::output(edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::string& name, const std::string& collName, bool writeCompound)
 {
   // Write jets and constitutents. Will use fjJets_, inputs_ (by default)
   // and fjClusterSeq_ (always)
@@ -549,16 +549,16 @@ void VirtualJetProducer::output(edm::Event & iEvent, edm::EventSetup const& iSet
     // Write jets and subjets
     switch( jetTypeE ) {
     case JetType::CaloJet :
-      writeCompoundJets<reco::CaloJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeCompoundJets<reco::CaloJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::PFJet :
-      writeCompoundJets<reco::PFJet>( iEvent, iSetup, fjJets, inputs, name, collName );
+      writeCompoundJets<reco::PFJet>( iEvent, iSetup, fjJets, name, collName );
       break;
     case JetType::GenJet :
-      writeCompoundJets<reco::GenJet>( iEvent, iSetup, fjJets, inputs, name, collName );
+      writeCompoundJets<reco::GenJet>( iEvent, iSetup, fjJets, name, collName );
       break;
     case JetType::BasicJet :
-      writeCompoundJets<reco::BasicJet>( iEvent, iSetup, fjJets, inputs, name, collName );
+      writeCompoundJets<reco::BasicJet>( iEvent, iSetup, fjJets, name, collName );
       break;
     default:
       throw cms::Exception("InvalidInput") << "invalid jet type in CompoundJetProducer\n";
@@ -566,26 +566,26 @@ void VirtualJetProducer::output(edm::Event & iEvent, edm::EventSetup const& iSet
     };
   } else if ( writeJetsWithConst_ ) {
     // Write jets and new constituents.
-    writeJetsWithConstituents<reco::PFJet>( iEvent, iSetup, fjJets, inputs, name, collName );
+    writeJetsWithConstituents<reco::PFJet>( iEvent, iSetup, fjJets, name, collName );
   } else {
     switch( jetTypeE ) {
     case JetType::CaloJet :
-      writeJets<reco::CaloJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::CaloJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::PFJet :
-      writeJets<reco::PFJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::PFJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::GenJet :
-      writeJets<reco::GenJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::GenJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::TrackJet :
-      writeJets<reco::TrackJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::TrackJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::PFClusterJet :
-      writeJets<reco::PFClusterJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::PFClusterJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     case JetType::BasicJet :
-      writeJets<reco::BasicJet>( iEvent, iSetup, fjJets, inputs, name, collName);
+      writeJets<reco::BasicJet>( iEvent, iSetup, fjJets, name, collName);
       break;
     default:
            throw cms::Exception("InvalidInput") << "invalid jet type in VirtualJetProducer\n";
@@ -607,7 +607,7 @@ struct Area<reco::CaloJet>{ static float get(reco::CaloJet const & jet) {
 }
 
 template< typename T >
-void VirtualJetProducer::writeJets( edm::Event & iEvent, edm::EventSetup const& iSetup,const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName )
+void VirtualJetProducer::writeJets( edm::Event & iEvent, edm::EventSetup const& iSetup,const std::vector<fastjet::PseudoJet>& fjJets, const std::string& name, const std::string& collName )
 {
   // std::cout << "writeJets " << typeid(T).name() 
   //          << (doRhoFastjet_ ? " doRhoFastjet " : "")
@@ -761,7 +761,7 @@ void VirtualJetProducer::writeJets( edm::Event & iEvent, edm::EventSetup const& 
 
 /// function template to write out the outputs
 template< class T>
-void VirtualJetProducer::writeCompoundJets(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName)
+void VirtualJetProducer::writeCompoundJets(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::string& name, const std::string& collName)
 {
   if ( verbosity_ >= 1 ) { 
     std::cout << "<VirtualJetProducer::writeCompoundJets (moduleLabel = " << moduleLabel_ << ")>:" << std::endl;
@@ -899,7 +899,7 @@ void VirtualJetProducer::writeCompoundJets(  edm::Event & iEvent, edm::EventSetu
 
 /// function template to write out the outputs
 template< class T>
-void VirtualJetProducer::writeJetsWithConstituents(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::vector<edm::Ptr<reco::Candidate>>& inputs, const std::string& name, const std::string& collName)
+void VirtualJetProducer::writeJetsWithConstituents(  edm::Event & iEvent, edm::EventSetup const& iSetup, const std::vector<fastjet::PseudoJet>& fjJets, const std::string& name, const std::string& collName)
 {
   if ( verbosity_ >= 1 ) {
     std::cout << "<VirtualJetProducer::writeJetsWithConstituents (moduleLabel = " << moduleLabel_ << ")>:" << std::endl;
@@ -958,7 +958,7 @@ void VirtualJetProducer::writeJetsWithConstituents(  edm::Event & iEvent, edm::E
   //Loop over constituents and store in the event
   static const reco::PFCandidate dummySinceTranslateIsNotStatic;
   for (fastjet::PseudoJet const& constit : constituentsSub) {
-    auto orig = inputs[constit.user_index()];
+    auto orig = inputs_[constit.user_index()];
     auto id = dummySinceTranslateIsNotStatic.translatePdgIdToType(orig->pdgId());
     reco::PFCandidate pCand( reco::PFCandidate(orig->charge(), orig->p4(), id) );
     math::XYZTLorentzVector pVec;

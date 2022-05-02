@@ -58,27 +58,11 @@ using namespace edm;
 // construction / destruction
 ////////////////////////////////////////////////////////////////////////////////
 
-//______________________________________________________________________________
-FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
-	VirtualJetProducer( iConfig )
-{
-	useOnlyVertexTracks_ = iConfig.getParameter<bool>("UseOnlyVertexTracks");
-	useOnlyOnePV_ 	= iConfig.getParameter<bool>("UseOnlyOnePV");
-	dzTrVtxMax_          = iConfig.getParameter<double>("DzTrVtxMax");
-	dxyTrVtxMax_          = iConfig.getParameter<double>("DxyTrVtxMax");
-	minVtxNdof_ = iConfig.getParameter<int>("MinVtxNdof");
-	maxVtxZ_ = iConfig.getParameter<double>("MaxVtxZ");
-
-	oneShotTransform_ = iConfig.getParameter<bool>("oneShotTransform");
-	jetPtMinTransform_ = iConfig.getParameter<double>("jetPtMinTransform");
-	jetTransformName_ = iConfig.getParameter<string>("jetTransformName");
-	jetTransformCollName_ = iConfig.getParameter<string>("jetTransformCollName");
-
-	if(oneShotTransform_){
-		//extra produces for transform output: always compound, never withConst
-		makeProduces(moduleLabel_, jetTransformCollName_, jetTransformName_, true, false);
-	}
-
+FastjetJetProducer::JetTransform::JetTransform(const edm::ParameterSet& iConfig) {
+	name_ = iConfig.getParameter<std::string>("name");
+	jetCollInstanceName_ = iConfig.getParameter<std::string>("jetCollInstanceName");
+	jetPtMin_ = iConfig.getParameter<double>("jetPtMin");
+	
 	useMassDropTagger_ = iConfig.getParameter<bool>("useMassDropTagger");
 	muCut_ = iConfig.getParameter<double>("muCut");
 	yCut_ = iConfig.getParameter<double>("yCut");
@@ -123,18 +107,6 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 	gridMaxRapidity_ = iConfig.getParameter<double>("gridMaxRapidity");
 	gridSpacing_ = iConfig.getParameter<double>("gridSpacing");
 
-	input_chrefcand_token_ = consumes<edm::View<reco::RecoChargedRefCandidate> >(iConfig.getParameter<edm::InputTag>("src"));
-
-	if ( useFiltering_ ||
-			useTrimming_ ||
-			usePruning_ ||
-			useMassDropTagger_ ||
-			useCMSBoostedTauSeedingAlgorithm_ ||
-			useConstituentSubtraction_ ||
-			useSoftDrop_ ||
-			correctShape_
-	   ) useExplicitGhosts_ = true;
-
 	////// adding exceptions
 	
 	if ( ( useMassDropTagger_ ) && ( ( muCut_ == -1 ) || ( yCut_ == -1 ) ) ) 
@@ -158,9 +130,6 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 				( dRMin_ == -1 )  || ( dRMax_ == -1 ) ) )
 		throw cms::Exception("useCMSBoostedTauSeedingAlgorithm") << "Parameters subjetPtMin, muMin, muMax, yMin, yMax, dRmin, dRmax, maxDepth for CMSBoostedTauSeedingAlgorithm are not defined." << std::endl;
 
-	if ( useConstituentSubtraction_ && ( fjAreaDefinition_.get() == nullptr ) ) 
-		throw cms::Exception("AreaMustBeSet") << "Logic error. The area definition must be set if you use constituent subtraction." << std::endl;
-
 	if ( ( useConstituentSubtraction_ ) && ( ( csRho_EtaMax_ == -1 ) || ( csRParam_ == -1 ) ) ) 
 		throw cms::Exception("useConstituentSubtraction") << "Parameters csRho_EtaMax and/or csRParam for ConstituentSubtraction are not defined." << std::endl;
 	
@@ -172,7 +141,32 @@ FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
 	
 	if ( ( correctShape_ ) && ( ( gridMaxRapidity_ == -1 ) || ( gridSpacing_ == -1 )) ) 
 		throw cms::Exception("correctShape") << "Parameters gridMaxRapidity and/or gridSpacing for SoftDrop are not defined." << std::endl;
-  
+}
+
+//______________________________________________________________________________
+FastjetJetProducer::FastjetJetProducer(const edm::ParameterSet& iConfig):
+	VirtualJetProducer( iConfig )
+{
+	useOnlyVertexTracks_ = iConfig.getParameter<bool>("UseOnlyVertexTracks");
+	useOnlyOnePV_ 	= iConfig.getParameter<bool>("UseOnlyOnePV");
+	dzTrVtxMax_          = iConfig.getParameter<double>("DzTrVtxMax");
+	dxyTrVtxMax_          = iConfig.getParameter<double>("DxyTrVtxMax");
+	minVtxNdof_ = iConfig.getParameter<int>("MinVtxNdof");
+	maxVtxZ_ = iConfig.getParameter<double>("MaxVtxZ");
+
+	doBaseClustering_ = iConfig.getParameter<bool>("doBaseClustering");
+	for(const auto& pset : iConfig.getParameter<std::vector<edm::ParameterSet>>("jetTransforms")){
+		jetTransforms_.emplace_back(pset);
+		if ( jetTransforms_.back().useConstituentSubtraction_ && ( fjAreaDefinition_.get() == nullptr ) ) 
+			throw cms::Exception("AreaMustBeSet") << "Logic error. The area definition must be set if you use constituent subtraction." << std::endl;
+		//extra produces for transform output: always compound, never withConst
+		makeProduces(moduleLabel_, jetTransforms_.back().jetCollInstanceName_, jetTransforms_.back().name_, true, false);
+	}
+
+	input_chrefcand_token_ = consumes<edm::View<reco::RecoChargedRefCandidate> >(iConfig.getParameter<edm::InputTag>("src"));
+
+	if (!jetTransforms_.empty())
+		useExplicitGhosts_ = true;
 }
 
 
@@ -370,111 +364,112 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
     fjClusterSeq_ = ClusterSequencePtr( new fastjet::ClusterSequenceVoronoiArea( fjInputs_, *fjJetDefinition_ , fastjet::VoronoiAreaSpec(voronoiRfact_) ) );
   }
 
-  bool doTransform = useMassDropTagger_ || useCMSBoostedTauSeedingAlgorithm_ || useTrimming_ || useFiltering_ || usePruning_ || useSoftDrop_ || useConstituentSubtraction_;
-  if ( oneShotTransform_ or !doTransform ) {
+  //todo: add "or !jetTransforms_.empty()" to this condition and do the base clustering with min(jetTransform.jetPtMin_)? would need to clear fjJets_ before this function exits to avoid producing unwanted jets
+  if ( doBaseClustering_ ) {
     fjJets_ = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
   }
-  if (doTransform) {
+  if (!jetTransforms_.empty()) {
 
-    std::vector<fastjet::PseudoJet> tempJets;
-    transformer_coll transformers;
+    for(const auto& jetTransform : jetTransforms_){
+      std::vector<fastjet::PseudoJet> tempJets;
+      transformer_coll transformers;
 
-    if(oneShotTransform_) {
-      tempJets = fjJets_;
-      //apply different jetPtMin
-      auto itJets = std::lower_bound(tempJets.rbegin(), tempJets.rend(), jetPtMinTransform_*jetPtMinTransform_, [](const fastjet::PseudoJet& jet, double min){ return jet.pt2() < min; });
-      tempJets.resize(std::distance(itJets, tempJets.rend()));
-    }
-    else {
-      fjJets_.clear();
-      tempJets = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetPtMin_));
-    }
-
-    unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
-    if ( useConstituentSubtraction_ ) {
-      fastjet::Selector rho_range =  fastjet::SelectorAbsRapMax(csRho_EtaMax_);
-      bge_rho = unique_ptr<fastjet::JetMedianBackgroundEstimator> (new  fastjet::JetMedianBackgroundEstimator(rho_range, fastjet::JetDefinition(fastjet::kt_algorithm, csRParam_), *fjAreaDefinition_) );
-      bge_rho->set_particles(fjInputs_);
-      fastjet::contrib::ConstituentSubtractor * constituentSubtractor = new fastjet::contrib::ConstituentSubtractor(bge_rho.get());
-
-      transformers.push_back( transformer_ptr(constituentSubtractor) );
-    };
-    if ( useMassDropTagger_ ) {
-      fastjet::MassDropTagger * md_tagger = new fastjet::MassDropTagger ( muCut_, yCut_ );
-      transformers.push_back( transformer_ptr(md_tagger) );
-    }
-    if ( useCMSBoostedTauSeedingAlgorithm_ ) {
-      fastjet::contrib::CMSBoostedTauSeedingAlgorithm * tau_tagger = 
-	new fastjet::contrib::CMSBoostedTauSeedingAlgorithm ( subjetPtMin_, muMin_, muMax_, yMin_, yMax_, dRMin_, dRMax_, maxDepth_, verbosity_ );
-      transformers.push_back( transformer_ptr(tau_tagger ));
-    }
-    if ( useTrimming_ ) {
-      fastjet::Filter * trimmer = new fastjet::Filter(fastjet::JetDefinition(fastjet::kt_algorithm, rFilt_), fastjet::SelectorPtFractionMin(trimPtFracMin_));
-      transformers.push_back( transformer_ptr(trimmer) );
-    } 
-    if ( (useFiltering_) && (!useDynamicFiltering_) ) {
-      fastjet::Filter * filter = new fastjet::Filter(fastjet::JetDefinition(fastjet::cambridge_algorithm, rFilt_), fastjet::SelectorNHardest(nFilt_));
-      transformers.push_back( transformer_ptr(filter));
-    } 
-
-    if ( (usePruning_)  && (!useKtPruning_) ) {
-      fastjet::Pruner * pruner = new fastjet::Pruner(fastjet::cambridge_algorithm, zCut_, RcutFactor_);
-      transformers.push_back( transformer_ptr(pruner ));
-    }
-
-    if ( useDynamicFiltering_ ){
-      fastjet::Filter * filter = new fastjet::Filter( fastjet::Filter(&*rFiltDynamic_, fastjet::SelectorNHardest(nFilt_)));
-      transformers.push_back( transformer_ptr(filter));
-    }
-
-    if ( useKtPruning_ ) {
-      fastjet::Pruner * pruner = new fastjet::Pruner(fastjet::kt_algorithm, zCut_, RcutFactor_);
-      transformers.push_back( transformer_ptr(pruner ));
-    }
-
-    if ( useSoftDrop_ ) {
-      fastjet::contrib::SoftDrop * sd = new fastjet::contrib::SoftDrop(beta_, zCut_, R0_ );
-      transformers.push_back( transformer_ptr(sd) );
-    }
-
-    unique_ptr<fastjet::Subtractor> subtractor;
-    unique_ptr<fastjet::GridMedianBackgroundEstimator> bge_rho_grid;
-    if ( correctShape_ ) {
-      bge_rho_grid = unique_ptr<fastjet::GridMedianBackgroundEstimator> (new  fastjet::GridMedianBackgroundEstimator(gridMaxRapidity_, gridSpacing_) );
-      bge_rho_grid->set_particles(fjInputs_);
-      subtractor = unique_ptr<fastjet::Subtractor>( new fastjet::Subtractor(  bge_rho_grid.get()) );
-      subtractor->set_use_rho_m();
-      //subtractor->use_common_bge_for_rho_and_rhom(true);
-    }
-
-    std::vector<fastjet::PseudoJet> fjJets; //for one-shot case
-    for ( std::vector<fastjet::PseudoJet>::const_iterator ijet = tempJets.begin(),
-	    ijetEnd = tempJets.end(); ijet != ijetEnd; ++ijet ) {
-
-      fastjet::PseudoJet transformedJet = *ijet;
-      bool passed = true;
-      for ( transformer_coll::const_iterator itransf = transformers.begin(),
-	      itransfEnd = transformers.end(); itransf != itransfEnd; ++itransf ) {
-	if ( transformedJet != 0 ) {
-	  transformedJet = (**itransf)(transformedJet);
-	} else {
-	  passed=false;
-	}
+      if(doBaseClustering_) {
+        tempJets = fjJets_;
+        //apply different jetPtMin
+        auto itJets = std::lower_bound(tempJets.rbegin(), tempJets.rend(), jetTransform.jetPtMin_*jetTransform.jetPtMin_, [](const fastjet::PseudoJet& jet, double min){ return jet.pt2() < min; });
+        tempJets.resize(std::distance(itJets, tempJets.rend()));
+      }
+      else {
+        fjJets_.clear();
+        tempJets = fastjet::sorted_by_pt(fjClusterSeq_->inclusive_jets(jetTransform.jetPtMin_));
       }
 
-      if ( correctShape_ ) {
-	transformedJet = (*subtractor)(transformedJet);
+      unique_ptr<fastjet::JetMedianBackgroundEstimator> bge_rho;
+      if ( jetTransform.useConstituentSubtraction_ ) {
+        fastjet::Selector rho_range =  fastjet::SelectorAbsRapMax(jetTransform.csRho_EtaMax_);
+        bge_rho = unique_ptr<fastjet::JetMedianBackgroundEstimator> (new  fastjet::JetMedianBackgroundEstimator(rho_range, fastjet::JetDefinition(fastjet::kt_algorithm, jetTransform.csRParam_), *fjAreaDefinition_) );
+        bge_rho->set_particles(fjInputs_);
+        fastjet::contrib::ConstituentSubtractor * constituentSubtractor = new fastjet::contrib::ConstituentSubtractor(bge_rho.get());
+
+        transformers.push_back( transformer_ptr(constituentSubtractor) );
+      };
+      if ( jetTransform.useMassDropTagger_ ) {
+        fastjet::MassDropTagger * md_tagger = new fastjet::MassDropTagger ( jetTransform.muCut_, jetTransform.yCut_ );
+        transformers.push_back( transformer_ptr(md_tagger) );
+      }
+      if ( jetTransform.useCMSBoostedTauSeedingAlgorithm_ ) {
+        fastjet::contrib::CMSBoostedTauSeedingAlgorithm * tau_tagger = 
+  	new fastjet::contrib::CMSBoostedTauSeedingAlgorithm ( jetTransform.subjetPtMin_, jetTransform.muMin_, jetTransform.muMax_, jetTransform.yMin_, jetTransform.yMax_, jetTransform.dRMin_, jetTransform.dRMax_, jetTransform.maxDepth_, verbosity_ );
+        transformers.push_back( transformer_ptr(tau_tagger ));
+      }
+      if ( jetTransform.useTrimming_ ) {
+        fastjet::Filter * trimmer = new fastjet::Filter(fastjet::JetDefinition(fastjet::kt_algorithm, jetTransform.rFilt_), fastjet::SelectorPtFractionMin(jetTransform.trimPtFracMin_));
+        transformers.push_back( transformer_ptr(trimmer) );
+      } 
+      if ( (jetTransform.useFiltering_) && (!jetTransform.useDynamicFiltering_) ) {
+        fastjet::Filter * filter = new fastjet::Filter(fastjet::JetDefinition(fastjet::cambridge_algorithm, jetTransform.rFilt_), fastjet::SelectorNHardest(jetTransform.nFilt_));
+        transformers.push_back( transformer_ptr(filter));
+      } 
+
+      if ( (jetTransform.usePruning_)  && (!jetTransform.useKtPruning_) ) {
+        fastjet::Pruner * pruner = new fastjet::Pruner(fastjet::cambridge_algorithm, jetTransform.zCut_, jetTransform.RcutFactor_);
+        transformers.push_back( transformer_ptr(pruner ));
       }
 
-      if ( passed ) {
-        if ( oneShotTransform_) fjJets.push_back( transformedJet );
-        else fjJets_.push_back( transformedJet );
+      if ( jetTransform.useDynamicFiltering_ ){
+        fastjet::Filter * filter = new fastjet::Filter( fastjet::Filter(&*jetTransform.rFiltDynamic_, fastjet::SelectorNHardest(jetTransform.nFilt_)));
+        transformers.push_back( transformer_ptr(filter));
       }
-    }
 
-    if(oneShotTransform_)
+      if ( jetTransform.useKtPruning_ ) {
+        fastjet::Pruner * pruner = new fastjet::Pruner(fastjet::kt_algorithm, jetTransform.zCut_, jetTransform.RcutFactor_);
+        transformers.push_back( transformer_ptr(pruner ));
+      }
+
+      if ( jetTransform.useSoftDrop_ ) {
+        fastjet::contrib::SoftDrop * sd = new fastjet::contrib::SoftDrop(jetTransform.beta_, jetTransform.zCut_, jetTransform.R0_ );
+        transformers.push_back( transformer_ptr(sd) );
+      }
+
+      unique_ptr<fastjet::Subtractor> subtractor;
+      unique_ptr<fastjet::GridMedianBackgroundEstimator> bge_rho_grid;
+      if ( jetTransform.correctShape_ ) {
+        bge_rho_grid = unique_ptr<fastjet::GridMedianBackgroundEstimator> (new  fastjet::GridMedianBackgroundEstimator(jetTransform.gridMaxRapidity_, jetTransform.gridSpacing_) );
+        bge_rho_grid->set_particles(fjInputs_);
+        subtractor = unique_ptr<fastjet::Subtractor>( new fastjet::Subtractor(  bge_rho_grid.get()) );
+        subtractor->set_use_rho_m();
+        //subtractor->use_common_bge_for_rho_and_rhom(true);
+      }
+
+      std::vector<fastjet::PseudoJet> fjJets; //for transform output case
+      for ( std::vector<fastjet::PseudoJet>::const_iterator ijet = tempJets.begin(),
+  	    ijetEnd = tempJets.end(); ijet != ijetEnd; ++ijet ) {
+
+        fastjet::PseudoJet transformedJet = *ijet;
+        bool passed = true;
+        for ( transformer_coll::const_iterator itransf = transformers.begin(),
+  	      itransfEnd = transformers.end(); itransf != itransfEnd; ++itransf ) {
+  	if ( transformedJet != 0 ) {
+  	  transformedJet = (**itransf)(transformedJet);
+  	} else {
+  	  passed=false;
+  	}
+        }
+
+        if ( jetTransform.correctShape_ ) {
+  	transformedJet = (*subtractor)(transformedJet);
+        }
+
+        if ( passed ) {
+          if ( doBaseClustering_) fjJets.push_back( transformedJet );
+          else fjJets_.push_back( transformedJet );
+        }
+      }
+
       //extra output call: writeCompound always true
-      output(iEvent, iSetup, fjJets, inputs_, jetTransformName_, jetTransformCollName_, true);
+      output(iEvent, iSetup, fjJets, jetTransform.name_, jetTransform.jetCollInstanceName_, true);
+    }
   }
 
 }
@@ -490,18 +485,23 @@ void FastjetJetProducer::fillDescriptions(edm::ConfigurationDescriptions& descri
         ////
 	descFastjetJetProducer.add<string>("jetCollInstanceName", ""	);
 	descFastjetJetProducer.add<bool> ("sumRecHits", false);
-	descFastjetJetProducer.add<bool> ("oneShotTransform", false);
-	descFastjetJetProducer.add<double> ("jetPtMinTransform", 0.);
-	descFastjetJetProducer.add<std::string> ("jetTransformName", "");
-	descFastjetJetProducer.add<std::string> ("jetTransformCollName", "");
+	descFastjetJetProducer.add<bool> ("doBaseClustering", true);
+
+	edm::ParameterSetDescription jetTransformValidator;
+	JetTransform::fillPSetDescription(jetTransformValidator);
+	std::vector<edm::ParameterSet> jetTransformDefaults;
+	descFastjetJetProducer.addVPSet("jetTransforms", jetTransformValidator, jetTransformDefaults);
 
 	/////////////////////
 	descriptions.add("FastjetJetProducer",descFastjetJetProducer);
 
 }
 
-void FastjetJetProducer::fillDescriptionsFromFastJetProducer(edm::ParameterSetDescription& desc)
+void FastjetJetProducer::JetTransform::fillPSetDescription(edm::ParameterSetDescription& desc)
 {
+	desc.add<std::string>("name", ""	);
+	desc.add<std::string>("jetCollInstanceName", ""	);
+	desc.add<double>("jetPtMin",		5. );
 	desc.add<bool>("useMassDropTagger",     false);
 	desc.add<bool>("useFiltering",	        false);
 	desc.add<bool>("useDynamicFiltering",	false);
@@ -512,8 +512,6 @@ void FastjetJetProducer::fillDescriptionsFromFastJetProducer(edm::ParameterSetDe
 	desc.add<bool>("useConstituentSubtraction", false);
 	desc.add<bool>("useSoftDrop",	false);
 	desc.add<bool>("correctShape",	false);
-	desc.add<bool>("UseOnlyVertexTracks",	false);
-	desc.add<bool>("UseOnlyOnePV",	false);
 	desc.add<double>("muCut",	-1.0);
 	desc.add<double>("yCut",	-1.0);
 	desc.add<double>("rFilt",	-1.0);
@@ -527,9 +525,6 @@ void FastjetJetProducer::fillDescriptionsFromFastJetProducer(edm::ParameterSetDe
 	desc.add<double>("R0",	-1.0);
 	desc.add<double>("gridMaxRapidity",	-1.0); // For fixed-grid rho
 	desc.add<double>("gridSpacing",	-1.0);  // For fixed-grid rho
-	desc.add<double>("DzTrVtxMax",	999999.);  
-	desc.add<double>("DxyTrVtxMax",	999999.);  
-	desc.add<double>("MaxVtxZ",	15.0);  
 	desc.add<double>("subjetPtMin",	-1.0);
 	desc.add<double>("muMin",	-1.0);
 	desc.add<double>("muMax",	-1.0);
@@ -539,6 +534,15 @@ void FastjetJetProducer::fillDescriptionsFromFastJetProducer(edm::ParameterSetDe
 	desc.add<double>("dRMax",	-1.0);
 	desc.add<int>("maxDepth",	-1);
 	desc.add<int>("nFilt",       	-1);
+}
+
+void FastjetJetProducer::fillDescriptionsFromFastJetProducer(edm::ParameterSetDescription& desc)
+{
+	desc.add<bool>("UseOnlyVertexTracks",	false);
+	desc.add<bool>("UseOnlyOnePV",	false);
+	desc.add<double>("DzTrVtxMax",	999999.);  
+	desc.add<double>("DxyTrVtxMax",	999999.);  
+	desc.add<double>("MaxVtxZ",	15.0);  
 	desc.add<int>("MinVtxNdof",	5);
 }
 

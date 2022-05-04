@@ -48,6 +48,7 @@ public:
     JetTransform(const edm::ParameterSet& iConfig);
     static void fillPSetDescription(edm::ParameterSetDescription& iDesc);
 
+    std::vector<fastjet::PseudoJet> fjJets_;    // fastjet jets
     double jetPtMin_;               // minimum jet pt for transform (may be different from central)
     std::string name_;              // name for transform output (to distinguish from central)
     std::string jetCollInstanceName_;          // name for transform output subjets (to distinguish from central)
@@ -111,6 +112,7 @@ protected:
 
   virtual void produceTrackJets( edm::Event & iEvent, const edm::EventSetup & iSetup );
   void runAlgorithm( edm::Event& iEvent, const edm::EventSetup& iSetup ) override;
+  void output(edm::Event& iEvent, edm::EventSetup const& iSetup) override;
 
  private:
 

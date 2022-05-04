@@ -370,7 +370,7 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
   }
   if (!jetTransforms_.empty()) {
 
-    for(const auto& jetTransform : jetTransforms_){
+    for(auto& jetTransform : jetTransforms_){
       std::vector<fastjet::PseudoJet> tempJets;
       transformer_coll transformers;
 
@@ -442,7 +442,6 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
         //subtractor->use_common_bge_for_rho_and_rhom(true);
       }
 
-      std::vector<fastjet::PseudoJet> fjJets; //for transform output case
       for ( std::vector<fastjet::PseudoJet>::const_iterator ijet = tempJets.begin(),
   	    ijetEnd = tempJets.end(); ijet != ijetEnd; ++ijet ) {
 
@@ -462,16 +461,21 @@ void FastjetJetProducer::runAlgorithm( edm::Event & iEvent, edm::EventSetup cons
         }
 
         if ( passed ) {
-          if ( doBaseClustering_) fjJets.push_back( transformedJet );
-          else fjJets_.push_back( transformedJet );
+          jetTransform.fjJets_.push_back( transformedJet );
         }
       }
-
-      //extra output call: writeCompound always true
-      output(iEvent, iSetup, fjJets, jetTransform.name_, jetTransform.jetCollInstanceName_, true);
     }
   }
 
+}
+
+void FastjetJetProducer::output(edm::Event& iEvent, edm::EventSetup const& iSetup) {
+  VirtualJetProducer::output(iEvent, iSetup);
+  //extra output calls for transforms: writeCompound always true
+  for(auto& jetTransform : jetTransforms_){
+    VirtualJetProducer::output(iEvent, iSetup, jetTransform.fjJets_, jetTransform.name_, jetTransform.jetCollInstanceName_, true);
+    decltype(jetTransform.fjJets_)().swap(jetTransform.fjJets_);
+  }
 }
 
 //______________________________________________________________________________

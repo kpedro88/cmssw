@@ -501,7 +501,7 @@ def miniAOD_customizeCommon(process):
         addToProcessAndTask('deepMETsResponseTune', process.deepMETProducer.clone(), process, task)
         # different ways to get response tune
         deepMETSonicTriton.toModify(process.deepMETsResponseTune, Client = dict(modelVersion = "2") )
-        (~deepMETSonicTriton).toModify(process.deepMETsResponseTune, graph_path = 'RecoMET/METPUSubtraction/data/deepmet/deepmet_resp_v1_2018.pb')
+        (~deepMETSonicTriton).toModify(process.deepMETsResponseTune, graph_path = 'RecoMET/METPUSubtraction/data/models/deepmet/deepmet_resp_v1_2018/model.graphdef')
 
         # these will not work with SONIC currently
         # should probably be moved to RecoMET.METPUSubtraction.deepMETProducer_cff (would simplify nano_cff, which also is not updated for SONIC)
@@ -509,18 +509,18 @@ def miniAOD_customizeCommon(process):
         phase2_common.toModify(
             process.deepMETsResolutionTune,
             max_n_pf=12500,
-            graph_path="RecoMET/METPUSubtraction/data/deepmet/deepmet_v1_phase2.pb"
+            graph_path="RecoMET/METPUSubtraction/data/models/deepmet/deepmet_v1_phase2/model.graphdef"
         )
         phase2_common.toModify(
             process.deepMETsResponseTune,
             max_n_pf=12500,
-            graph_path="RecoMET/METPUSubtraction/data/deepmet/deepmet_resp_v1_phase2.pb"
+            graph_path="RecoMET/METPUSubtraction/data/models/deepmet/deepmet_resp_v1_phase2/model.graphdef"
         )
 
         from Configuration.Eras.Modifier_run2_jme_2016_cff import run2_jme_2016
         run2_jme_2016.toModify(
             process.deepMETsResponseTune,
-            graph_path="RecoMET/METPUSubtraction/data/deepmet/deepmet_resp_v1_2016.pb"
+            graph_path="RecoMET/METPUSubtraction/data/models/deepmet/deepmet_resp_v1_2016/model.graphdef"
         )
     (~pp_on_AA).toModify(process, _add_deepMET)
 

@@ -7,7 +7,7 @@ deepMETSonicProducer = _deepMETSonicProducer.clone(
         timeout = 300,
         mode = "Async",
         modelName = "deepmet",
-        modelConfigPath = "RecoMET/METPUSubtraction/data/deepmet/deepmet/config.pbtxt",
+        modelConfigPath = "RecoMET/METPUSubtraction/data/models/deepmet/config.pbtxt",
         # version "1" is the resolutionTune
         # version "2" is the responeTune
         modelVersion = "1",

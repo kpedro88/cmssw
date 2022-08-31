@@ -82,6 +82,7 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxE
 
 process.source = cms.Source("EmptySource")
 
+process.TritonService.fallback.enable = False
 process.TritonService.verbose = options.verbose
 process.TritonService.fallback.verbose = options.verbose
 process.TritonService.fallback.useDocker = options.docker

@@ -40,6 +40,7 @@ PSet script.   See notes in EventProcessor.cpp for details about it.
 #include <memory>
 #include <string>
 #include <vector>
+#include <functional>
 
 //Command line parameters
 static char const* const kParameterSetOpt = "parameter-set";
@@ -57,6 +58,8 @@ static char const* const kSizeOfStackForThreadCommandOpt = "sizeOfStackForThread
 static char const* const kSizeOfStackForThreadOpt = "sizeOfStackForThreadsInKB";
 static char const* const kHelpOpt = "help";
 static char const* const kHelpCommandOpt = "help,h";
+static char const* const kTraceOpt = "traceException";
+static char const* const kTraceCommandOpt = "traceException,t";
 static char const* const kStrictOpt = "strict";
 
 // -----------------------------------------------
@@ -102,6 +105,34 @@ namespace {
     edm::EventProcessor* ep_;
   };
 
+  // All exceptions which are not handled before propagating
+  // into main will get caught here.
+  template <typename F>
+  int wrapTryCatch(F func, const std::string& context, bool alwaysAddContext, std::shared_ptr<edm::serviceregistry::ServiceWrapper<edm::JobReport> > jobRep){
+    int returnCode = 0;
+    try {
+      returnCode = edm::convertException::wrap(func);
+    }
+    catch (cms::Exception& ex) {
+      returnCode = ex.returnCode();
+      if (!context.empty()) {
+        if (alwaysAddContext) {
+          ex.addContext(context);
+        } else if (ex.context().empty()) {
+          ex.addContext(context);
+        }
+      }
+      if (!ex.alreadyPrinted()) {
+        if (jobRep.get() != nullptr) {
+          edm::printCmsException(ex, &(jobRep->get()), returnCode);
+        } else {
+          edm::printCmsException(ex);
+        }
+      }
+    }
+   return returnCode;
+  }
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -118,9 +149,11 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<std::ofstream> jobReportStreamPtr;
   std::shared_ptr<edm::serviceregistry::ServiceWrapper<edm::JobReport> > jobRep;
   EventProcessorWithSentry proc;
+  unsigned int nThreads = 0;
+      std::shared_ptr<edm::ProcessDesc> processDesc;
+  bool traceException = false;
 
-  try {
-    returnCode = edm::convertException::wrap([&]() -> int {
+  std::function<int()> step1 = [&]() -> int {
 
     // NOTE: MacOs X has a lower rlimit for opened file descriptor than Linux (256
     // in Snow Leopard vs 512 in SLC5). This is a problem for some of the workflows
@@ -166,7 +199,8 @@ int main(int argc, char* argv[]) {
           "Number of threads to use in job (0 is use all CPUs)")(
           kSizeOfStackForThreadCommandOpt,
           boost::program_options::value<unsigned int>(),
-          "Size of stack in KB to use for extra threads (0 is use system default size)")(kStrictOpt, "strict parsing");
+          "Size of stack in KB to use for extra threads (0 is use system default size)")(
+          kTraceCommandOpt, "enable stacktrace for exceptions")(kStrictOpt, "strict parsing");
       // clang-format on
 
       // anything at the end will be ignored, and sent to python
@@ -217,6 +251,10 @@ int main(int argc, char* argv[]) {
         edm::LogSystem("CommandLineProcessing") << "Strict configuration processing is now done from python";
       }
 
+      if (vm.count(kTraceOpt)) {
+        traceException = true;
+      }
+
       context = "Creating the JobReport Service";
       // Decide whether to enable creation of job report xml file
       //  We do this first so any errors will be reported
@@ -232,11 +270,9 @@ int main(int argc, char* argv[]) {
       // is called jobReportStreamPtr is still valid
       auto jobRepPtr = std::make_unique<edm::JobReport>(jobReportStreamPtr.get());
       jobRep.reset(new edm::serviceregistry::ServiceWrapper<edm::JobReport>(std::move(jobRepPtr)));
-      edm::ServiceToken jobReportToken = edm::ServiceRegistry::createContaining(jobRep);
 
       context = "Processing the python configuration file named ";
       context += fileName;
-      std::shared_ptr<edm::ProcessDesc> processDesc;
       try {
         std::unique_ptr<edm::ParameterSet> parameterSet = edm::readConfig(fileName, argc, argv);
         processDesc.reset(new edm::ProcessDesc(std::move(parameterSet)));
@@ -255,7 +291,6 @@ int main(int argc, char* argv[]) {
       //
       // Finally, reflect the values being used in the "options" top level ParameterSet.
       context = "Setting up number of threads";
-      unsigned int nThreads = 0;
       {
         // check the "options" ParameterSet
         std::shared_ptr<edm::ParameterSet> pset = processDesc->getProcessPSet();
@@ -292,7 +327,18 @@ int main(int argc, char* argv[]) {
         std::string jobMode = vm[kJobModeOpt].as<std::string>();
         edm::MessageDrop::instance()->jobMode = jobMode;
       }
+      return returnCode;
+  };
 
+  returnCode = wrapTryCatch(step1, context, alwaysAddContext, jobRep);
+  if (returnCode != 0) {
+    // Disable Root Error Handler.
+    SetErrorHandler(DefaultErrorHandler);
+    return returnCode;
+  }
+
+  std::function<int()> step2 = [&]() -> int {
+      edm::ServiceToken jobReportToken = edm::ServiceRegistry::createContaining(jobRep);
       oneapi::tbb::task_arena arena(nThreads);
       arena.execute([&]() {
         context = "Constructing the EventProcessor";
@@ -319,27 +365,12 @@ int main(int argc, char* argv[]) {
         proc->endJob();
       });
       return returnCode;
-    });
-  }
-  // All exceptions which are not handled before propagating
-  // into main will get caught here.
-  catch (cms::Exception& ex) {
-    returnCode = ex.returnCode();
-    if (!context.empty()) {
-      if (alwaysAddContext) {
-        ex.addContext(context);
-      } else if (ex.context().empty()) {
-        ex.addContext(context);
-      }
-    }
-    if (!ex.alreadyPrinted()) {
-      if (jobRep.get() != nullptr) {
-        edm::printCmsException(ex, &(jobRep->get()), returnCode);
-      } else {
-        edm::printCmsException(ex);
-      }
-    }
-  }
+  };
+
+  if (traceException)
+    returnCode = step2();
+  else
+    returnCode = wrapTryCatch(step2, context, alwaysAddContext, jobRep);
   // Disable Root Error Handler.
   SetErrorHandler(DefaultErrorHandler);
   return returnCode;

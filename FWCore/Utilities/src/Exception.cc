@@ -1,10 +1,12 @@
-
 #include "FWCore/Utilities/interface/Exception.h"
+#include "boost/stacktrace.hpp"
 
 namespace cms {
 
   Exception::Exception(std::string const& aCategory)
-      : std::exception(), ost_(), category_(aCategory), what_(), context_(), additionalInfo_(), alreadyPrinted_(false) {}
+      : std::exception(), ost_(), category_(aCategory), what_(), context_(), additionalInfo_(), alreadyPrinted_(false) {
+    init();
+  }
 
   Exception::Exception(char const* aCategory)
       : std::exception(),
@@ -13,7 +15,9 @@ namespace cms {
         what_(),
         context_(),
         additionalInfo_(),
-        alreadyPrinted_(false) {}
+        alreadyPrinted_(false) {
+    init();
+  }
 
   Exception::Exception(std::string const& aCategory, std::string const& message)
       : std::exception(), ost_(), category_(aCategory), what_(), context_(), additionalInfo_(), alreadyPrinted_(false) {
@@ -54,6 +58,10 @@ namespace cms {
       if (message[sz] != '\n' && message[sz] != ' ')
         ost_ << " ";
     }
+//    if (cms::GlobalSettings::get()::doTrace()) {
+    if (true) {
+      trace_ = boost::stacktrace::to_string(boost::stacktrace::stacktrace());
+    }
   }
 
   Exception::Exception(std::string const& aCategory, std::string const& message, Exception const& another)
@@ -63,6 +71,7 @@ namespace cms {
         what_(),
         context_(another.context()),
         additionalInfo_(another.additionalInfo()),
+        trace_(another.trace()),
         alreadyPrinted_(false) {
     ost_ << message;
     // check for newline at end of message first
@@ -79,6 +88,7 @@ namespace cms {
         what_(other.what_),
         context_(other.context_),
         additionalInfo_(other.additionalInfo_),
+        trace_(other.trace_),
         alreadyPrinted_(other.alreadyPrinted_) {
     ost_ << other.ost_.str();
   }
@@ -91,6 +101,7 @@ namespace cms {
     what_.swap(other.what_);
     context_.swap(other.context_);
     additionalInfo_.swap(other.additionalInfo_);
+    trace_.swap(other.trace_);
     std::swap(alreadyPrinted_, other.alreadyPrinted_);
   }
 
@@ -137,6 +148,15 @@ namespace cms {
         ost << "      [" << c << "] " << *i << "\n";
       }
     }
+
+    if (!trace_.empty()) {
+      ost << "\n   Stack trace:\n";
+      ost << trace_;
+      if (trace_[trace_.size() - 1] != '\n') {
+        ost << "\n";
+      }
+    }
+
     return ost.str();
   }
 
@@ -147,6 +167,8 @@ namespace cms {
   std::list<std::string> const& Exception::context() const { return context_; }
 
   std::list<std::string> const& Exception::additionalInfo() const { return additionalInfo_; }
+
+  const std::string& Exception::trace() const { return trace_; }
 
   int Exception::returnCode() const { return returnCode_(); }
 

@@ -96,6 +96,7 @@ namespace cms {
     std::string message() const;
     std::list<std::string> const& context() const;
     std::list<std::string> const& additionalInfo() const;
+    const std::string& trace() const;
     int returnCode() const;
 
     void raise() { rethrow(); }
@@ -119,6 +120,8 @@ namespace cms {
 
     bool alreadyPrinted() const;
     void setAlreadyPrinted(bool value);
+
+    bool doTrace() const;
 
     virtual Exception* clone() const;
 
@@ -176,7 +179,7 @@ namespace cms {
     std::list<std::string> history() const;
 
   private:
-    void init(std::string const& message);
+    void init(std::string const& message="");
     virtual void rethrow();
     virtual int returnCode_() const;
 
@@ -187,6 +190,7 @@ namespace cms {
     CMS_SA_ALLOW mutable std::string what_;
     std::list<std::string> context_;
     std::list<std::string> additionalInfo_;
+    std::string trace_;
     bool alreadyPrinted_;
   };
 

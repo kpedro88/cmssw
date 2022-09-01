@@ -24,6 +24,7 @@ PSet script.   See notes in EventProcessor.cpp for details about it.
 #include "FWCore/Utilities/interface/Exception.h"
 #include "FWCore/Utilities/interface/EDMException.h"
 #include "FWCore/Utilities/interface/ConvertException.h"
+#include "FWCore/Utilities/interface/GlobalSettings.h"
 #include "FWCore/Utilities/interface/Presence.h"
 #include "FWCore/Utilities/interface/TimingServiceBase.h"
 #include "FWCore/Utilities/interface/thread_safety_macros.h"
@@ -57,6 +58,8 @@ static char const* const kSizeOfStackForThreadCommandOpt = "sizeOfStackForThread
 static char const* const kSizeOfStackForThreadOpt = "sizeOfStackForThreadsInKB";
 static char const* const kHelpOpt = "help";
 static char const* const kHelpCommandOpt = "help,h";
+static char const* const kTraceOpt = "traceException";
+static char const* const kTraceCommandOpt = "traceException,t";
 static char const* const kStrictOpt = "strict";
 
 // -----------------------------------------------
@@ -103,6 +106,18 @@ namespace {
   };
 
 }  // namespace
+
+namespace cms {
+  class GlobalSettingsEditor {
+  public:
+    GlobalSettingsEditor() {}
+
+    //accessors
+    void setTrace(bool t) {
+      GlobalSettings::get_().setTrace(t);
+    }
+  };
+}
 
 int main(int argc, char* argv[]) {
   edm::TimingServiceBase::jobStarted();
@@ -166,7 +181,8 @@ int main(int argc, char* argv[]) {
           "Number of threads to use in job (0 is use all CPUs)")(
           kSizeOfStackForThreadCommandOpt,
           boost::program_options::value<unsigned int>(),
-          "Size of stack in KB to use for extra threads (0 is use system default size)")(kStrictOpt, "strict parsing");
+          "Size of stack in KB to use for extra threads (0 is use system default size)")(kStrictOpt, "strict parsing")(
+          kTraceCommandOpt, "enable stacktrace for exceptions")(kStrictOpt, "strict parsing");
       // clang-format on
 
       // anything at the end will be ignored, and sent to python
@@ -215,6 +231,11 @@ int main(int argc, char* argv[]) {
       if (vm.count(kStrictOpt)) {
         //edm::setStrictParsing(true);
         edm::LogSystem("CommandLineProcessing") << "Strict configuration processing is now done from python";
+      }
+
+      cms::GlobalSettingsEditor ed;
+      if (vm.count(kTraceOpt)) {
+        ed.setTrace(true);
       }
 
       context = "Creating the JobReport Service";

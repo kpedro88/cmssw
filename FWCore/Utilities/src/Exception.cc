@@ -1,4 +1,5 @@
 #include "FWCore/Utilities/interface/Exception.h"
+#include "FWCore/Utilities/interface/GlobalSettings.h"
 #include "boost/stacktrace.hpp"
 
 namespace cms {
@@ -58,8 +59,7 @@ namespace cms {
       if (message[sz] != '\n' && message[sz] != ' ')
         ost_ << " ";
     }
-//    if (cms::GlobalSettings::get()::doTrace()) {
-    if (true) {
+    if (cms::GlobalSettings::get().trace()) {
       trace_ = boost::stacktrace::to_string(boost::stacktrace::stacktrace());
     }
   }

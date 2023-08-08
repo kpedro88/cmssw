@@ -39,7 +39,8 @@ siPixelPhase1OfflineDQM_source = cms.Sequence(SiPixelPhase1RawDataAnalyzer
                                             + SiPixelPhase1RecHitsAnalyzer
                                             + SiPixelPhase1TrackResidualsAnalyzer
                                             + SiPixelPhase1TrackClustersAnalyzer
-                                            + SiPixelPhase1TrackEfficiencyAnalyzer
+                                            + SiPixelPhase1TrackEfficiencyAnalyzer,
+                                            cms.Task(SiPixelTemplateStoreESProducer)  
                                             )
 
 

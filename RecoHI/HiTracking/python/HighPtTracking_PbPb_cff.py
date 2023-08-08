@@ -32,4 +32,5 @@ hiBasicTrackingTask = cms.Task(hiPixelVerticesTask
                                 , hiPrimTrackCandidates
                                 , hiGlobalPrimTracks
                                 , hiTracksWithQualityTask
+                                , SiPixelTemplateStoreESProducer
                                 )

@@ -49,7 +49,8 @@ generalTracksTask = cms.Task(
     duplicateTrackCandidates,
     mergedDuplicateTracks,
     duplicateTrackClassifier,
-    generalTracks
+    generalTracks,
+    SiPixelTemplateStoreESProducer
     )
 generalTracksSequence = cms.Sequence(generalTracksTask)
 

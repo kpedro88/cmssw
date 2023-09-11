@@ -44,7 +44,8 @@ void SiStripApprox2Clusters::produce(edm::StreamID id, edm::Event& event, const 
 
   for (const auto& detClusters : clusterCollection) {
     //check for empty set
-    if (detClusters.begin()==detClusters.end()) continue;
+    if (detClusters.begin() == detClusters.end())
+      continue;
 
     edmNew::DetSetVector<SiStripCluster>::FastFiller ff{*result, detClusters.id()};
     unsigned int detId = detClusters.id();

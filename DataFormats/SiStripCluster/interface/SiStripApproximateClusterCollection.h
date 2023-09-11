@@ -43,9 +43,10 @@ public:
     DetSet(SiStripApproximateClusterCollection const* coll, unsigned int detIndex)
         : coll_(coll),
           detIndex_(detIndex),
-          clusBegin_(coll_->beginIndices_[detIndex]),
-          clusEnd_(detIndex == coll_->beginIndices_.size() - 1 ? coll->clusters_.size()
-                                                               : coll_->beginIndices_[detIndex + 1]) {}
+          clusBegin_(coll_->beginIndices_.empty() ? 0 : coll_->beginIndices_[detIndex]),
+          clusEnd_(coll_->beginIndices_.empty()                  ? 0
+                   : detIndex == coll_->beginIndices_.size() - 1 ? coll->clusters_.size()
+                                                                 : coll_->beginIndices_[detIndex + 1]) {}
 
     SiStripApproximateClusterCollection const* const coll_;
     unsigned int const detIndex_;

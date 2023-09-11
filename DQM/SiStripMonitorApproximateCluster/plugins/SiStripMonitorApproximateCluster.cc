@@ -169,7 +169,8 @@ void SiStripMonitorApproximateCluster::analyze(const edm::Event& iEvent, const e
 
   for (const auto& detClusters : *clusterCollection) {
     //check for empty set
-    if (detClusters.begin()==detClusters.end()) continue;
+    if (detClusters.begin() == detClusters.end())
+      continue;
 
     edmNew::DetSet<SiStripCluster> strip_clusters_detset;
     const auto& detid = detClusters.id();  // get the detid of the current detset

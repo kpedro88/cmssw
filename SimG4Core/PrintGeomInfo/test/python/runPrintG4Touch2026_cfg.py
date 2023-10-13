@@ -1,3 +1,4 @@
+# add a pointles comment
 ###############################################################################
 # Way to use this:
 #   cmsRun runPrintG4Touch_cfg.py geometry=D98 type=DDD

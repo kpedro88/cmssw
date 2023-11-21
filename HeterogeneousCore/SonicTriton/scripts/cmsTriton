@@ -34,7 +34,7 @@ get_sandbox(){
 
 usage() {
 	ECHO="echo -e"
-	$ECHO "cmsTriton [options] [start|stop]"
+	$ECHO "cmsTriton [options] [start|stop|check|checksum]"
 	$ECHO
 	$ECHO "Options:"
 	$ECHO "-c          \t don't cleanup temporary dir (for debugging)"
@@ -61,6 +61,7 @@ usage() {
 	$ECHO "start       \t start server"
 	$ECHO "stop        \t stop server"
 	$ECHO "check       \t check if server can run on this system"
+	$ECHO "checksum    \t update model checksums"
 	exit $1
 }
 
@@ -116,7 +117,7 @@ done
 shift $(($OPTIND - 1))
 OP=$1
 
-if [ "$OP" != start ] && [ "$OP" != stop ] && [ "$OP" != check ]; then
+if [ "$OP" != start ] && [ "$OP" != stop ] && [ "$OP" != check ] && [ "$OP" != checksum ]; then
 	usage 1
 fi
 
@@ -568,6 +569,57 @@ check_drivers(){
 	fi
 }
 
+model_checksums(){
+	# get all models from repo dirs
+	for REPO in ${REPOS[@]}; do
+		for MODEL in $REPO/*/; do
+			MODELS+=("$MODEL")
+		done
+	done
+	CURDIR=$PWD
+	for MODEL in ${MODELS[@]}; do
+		# always go back to current directory first in case of relative paths
+		cd $CURDIR
+		cd $MODEL
+		CONFIG=config.pbtxt
+		if [ ! -w $CONFIG ]; then
+			echo "Config file for model $MODEL not writable"
+			continue
+		fi
+		if ! grep -q model_repository_agents ${CONFIG}; then
+			cat << EOF >> ${CONFIG}
+model_repository_agents {
+  agents [
+    { name: "checksum", parameters [
+      ]
+    }
+  ]
+}
+EOF
+		fi
+		for FILE in */*; do
+			SEARCH='key: "'$FILE'"'
+			CHECKSUM_NEW=$(md5sum $FILE | cut -d' ' -f1)
+			LINE_NEW='      { '"$SEARCH"', value: "'$CHECKSUM_NEW'" },'
+			LINE=$(grep -s "$SEARCH" ${CONFIG})
+			FOUND=$?
+			if [ $FOUND -eq 0 ]; then
+				# recheck the checksum
+				CHECKSUM_OLD=$(echo $LINE | grep -E -o 'value: "(.*)"' | cut -d' ' -f2 | tr -d '"')
+				if [[ "$CHECKSUM_OLD" != "$CHECKSUM_NEW" ]]; then
+					echo "Updating checksum for $FILE"
+					sed -i '\|'"$SEARCH"'|c\'"$LINE_NEW" $CONFIG
+				fi
+			else
+				# create checksum
+				echo "Creating checksum for $FILE"
+				SECTION='name: "checksum"'
+				sed -i '\|'"$SECTION"'|a\'"$LINE_NEW" $CONFIG
+			fi
+		done
+	done
+}
+
 if [ -n "$USEDOCKER" ]; then
 	if [ -n "$GPU" ]; then
 		EXTRA="--gpus all"
@@ -592,6 +644,9 @@ fi
 
 if [ "$OP" == check ]; then
 	check_drivers
+	exit $?
+elif [ "$OP" == checksum ]; then
+	model_checksums
 	exit $?
 elif [ "$OP" == start ]; then
 	# handle cleaning up

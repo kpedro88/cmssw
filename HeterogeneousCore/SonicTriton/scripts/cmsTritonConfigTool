@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+
+import os, json
+from collections import OrderedDict
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpFormatter, RawDescriptionHelpFormatter, Action
+from google.protobuf import text_format, json_format, message, descriptor
+from google.protobuf.internal import type_checkers
+from tritonclient import grpc
+
+# convenience definition
+# (from ConfigArgParse)
+class ArgumentDefaultsRawHelpFormatter(
+    ArgumentDefaultsHelpFormatter,
+    RawTextHelpFormatter,
+    RawDescriptionHelpFormatter):
+    """HelpFormatter that adds default values AND doesn't do line-wrapping"""
+pass
+
+class DictAction(Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        result = {}
+        if len(values)%2!=0:
+            parser.error("{} args must come in pairs".format(self.dest))
+        for i in range(0, len(values), 2):
+            result[values[i]] = self.val_type(values[i+1])
+        setattr(namespace, self.dest, result)
+
+message_classes = {cls.__name__ : cls for cls in message.Message.__subclasses__()}
+
+_FieldDescriptor = descriptor.FieldDescriptor
+cpp_to_python = {
+    _FieldDescriptor.CPPTYPE_INT32: int,
+    _FieldDescriptor.CPPTYPE_INT64: int,
+    _FieldDescriptor.CPPTYPE_UINT32: int,
+    _FieldDescriptor.CPPTYPE_UINT64: int,
+    _FieldDescriptor.CPPTYPE_DOUBLE: float,
+    _FieldDescriptor.CPPTYPE_FLOAT: float,
+    _FieldDescriptor.CPPTYPE_BOOL: bool,
+    _FieldDescriptor.CPPTYPE_STRING: str,
+}
+checker_to_type = {val.__class__:cpp_to_python[key] for key,val in type_checkers._VALUE_CHECKERS.items()}
+# for some reason, this one is not in the map
+checker_to_type[type_checkers.UnicodeValueChecker] = str
+
+def get_type(obj):
+    obj_type = obj.__class__.__name__
+    entry_type = None
+    entry_class = None
+    if obj_type=="RepeatedCompositeFieldContainer" or obj_type=="MessageMap":
+        entry_type = obj._message_descriptor.name
+        entry_class = message_classes[entry_type]
+    elif obj_type=="RepeatedScalarFieldContainer":
+        entry_class = checker_to_type[obj._type_checker.__class__]
+        entry_type = entry_class.__name__
+    elif obj_type=="ScalarMap":
+        entry_class = obj.GetEntryClass()().value.__class__
+        entry_type = entry_class.__name__
+    return {
+        "class": obj.__class__,
+        "type": obj_type+("<"+entry_type+">" if entry_type is not None else ""),
+        "entry_class": entry_class,
+        "entry_type": entry_type,
+    }
+
+def get_fields(obj, name, level=0, verbose=False):
+    prefix = '    '*level
+    obj_info = {"name": name, "fields": []}
+    obj_info.update(get_type(obj))
+    if verbose: print(prefix+obj_info["type"],name)
+    field_obj = None
+    if hasattr(obj, "DESCRIPTOR"):
+        field_obj = obj
+    elif obj_info["entry_class"] is not None and hasattr(obj_info["entry_class"], "DESCRIPTOR"):
+        field_obj = obj_info["entry_class"]()
+    field_list = []
+    if field_obj is not None:
+        field_list = [f.name for f in field_obj.DESCRIPTOR.fields]
+    for field in field_list:
+        obj_info["fields"].append(get_fields(getattr(field_obj,field),field,level+1,verbose))
+    return obj_info
+
+def msg_json(val, defaults=False):
+    return json_format.MessageToJson(val, preserving_proto_field_name=True, including_default_value_fields=defaults, indent=0).replace(",\n",", ").replace("\n","")
+
+def print_fields(obj, info, level=0, json=False, defaults=False):
+    def print_subfields(obj,level):
+        fields = obj.DESCRIPTOR.fields if defaults else [f[0] for f in obj.ListFields()]
+        for field in fields:
+            print_fields(getattr(obj,field.name), next(f for f in info["fields"] if f["name"]==field.name), level=level, json=json, defaults=defaults)
+
+    prefix = '    '
+    print(prefix*level+info["type"],info["name"])
+    if hasattr(obj, "DESCRIPTOR"):
+        if json and level>0:
+            print(prefix*(level+1)+msg_json(obj, defaults))
+        else:
+            print_subfields(obj,level+1)
+    elif info["type"].startswith("RepeatedCompositeFieldContainer"):
+        if json:
+            print(prefix*(level+1)+str([msg_json(val, defaults) for val in obj]))
+        else:
+            for ientry,entry in enumerate(obj):
+                print(prefix*(level+1)+"{}: ".format(ientry))
+                print_subfields(entry,level+2)
+    elif info["type"].startswith("MessageMap"):
+        if json:
+            print(prefix*(level+1)+str({key:msg_json(val, defaults) for key,val in obj.items()}))
+        else:
+            for key,val in obj.items():
+                print(prefix*(level+1)+"{}: ".format(key))
+                print_subfields(val,level+2)
+    else:
+        print(prefix*(level+1)+str(obj))
+
+def edit_builtin(model,dest,val):
+    setattr(model,dest,val)
+
+def edit_scalar_list(model,dest,val):
+    item = getattr(model,dest)
+    item.clear()
+    item.extend(val)
+
+def edit_scalar_map(model,dest,val):
+    item = getattr(model,dest)
+    item.clear()
+    item.update(val)
+
+def edit_msg(model,dest,val):
+    item = getattr(model,dest)
+    json_format.ParseDict(val,item)
+
+def edit_msg_list(model,dest,val):
+    item = getattr(model,dest)
+    item.clear()
+    for v in vals:
+        m = item.add()
+        json_format.ParseDict(v,m)
+
+def edit_msg_map(model,dest,val):
+    item = getattr(model,dest)
+    item.clear()
+    for k,v in vals.items():
+        m = item.get_or_create(k)
+        json_format.ParseDict(v,m)
+
+def add_edit_args(parser, model_info):
+    group = parser.add_argument_group("fields", description="ModelConfig fields to edit")
+    dests = {}
+    for field in model_info["fields"]:
+        argname = "--{}".format(field["name"].replace("_","-"))
+        val_type = None
+        editor = None
+        if field["class"].__module__=="builtins":
+            kwargs = dict(type=field["class"])
+            editor = edit_builtin
+        elif field["type"].startswith("RepeatedScalarFieldContainer"):
+            kwargs = dict(type=field["entry_class"], nargs='*')
+            editor = edit_scalar_list
+        elif field["type"].startswith("ScalarMap"):
+            kwargs = dict(type=str, nargs='*', metavar="key value", action=DictAction)
+            val_type = field["entry_class"]
+            editor = edit_scalar_map
+        elif field["type"].startswith("RepeatedCompositeFieldContainer"):
+            kwargs = dict(type=json.loads, nargs='*',
+                help="provide {} values in json format".format(field["entry_type"])
+            )
+            editor = edit_msg_list
+        elif field["type"].startswith("MessageMap"):
+            kwargs = dict(type=str, nargs='*', metavar="key value", action=DictAction,
+                help="provide {} values in json format".format(field["entry_type"])
+            )
+            editor = edit_msg_map
+            val_type = json.loads
+        else:
+            kwargs = dict(type=json.loads,
+                help="provide {} values in json format".format(field["type"])
+            )
+            edit = edit_msg
+        action = group.add_argument(argname, **kwargs)
+        if val_type is not None: action.val_type = val_type
+        dests[action.dest] = editor
+    return parser, dests
+
+def cfg_schema(args):
+    get_fields(args.model, "ModelConfig", verbose=True)
+
+def cfg_view(args):
+    print("Contents of {}".format(args.config))
+    print_fields(args.model, args.model_info, json=args.json, defaults=args.defaults)
+
+def cfg_edit(args):
+    # todo
+    for dest,editor,val in [(dest,editor,getattr(args,dest)) for dest,editor in args.edit_dests.items() if getattr(args,dest) is not None]:
+        editor(args.model,dest,val)
+
+    # update config path to be output path (in case view is called)
+    if args.copy:
+        args.config = "config.pbtxt"
+        if isinstance(args.copy,str):
+            args.config = os.path.join(args.copy, args.config)
+
+    with open(args.config,'w') as outfile:
+        text_format.PrintMessage(args.model, outfile)
+    
+    if args.view:
+        cfg_view(args)
+
+if __name__=="__main__":
+    # initial common operations
+    model = grpc.model_config_pb2.ModelConfig()
+    model_info = get_fields(model, "ModelConfig")
+    edit_dests = None
+
+    parser_common = ArgumentParser(add_help=False)
+    parser_common.add_argument("-c", "--config", type=str, default="", required=True, help="path to input config.pbtxt file")
+
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsRawHelpFormatter)
+    subparsers = parser.add_subparsers(dest="command")
+
+    parser_schema = subparsers.add_parser("schema", help="view ModelConfig schema",
+        description="""Display all fields in the ModelConfig object, with type information.
+    (For collection types, the subfields of the entry type are shown.)""",
+    )
+    parser_schema.set_defaults(func=cfg_schema)
+
+    def add_view_args(parser):
+        parser.add_argument("--json", default=False, action="store_true", help="display in json format")
+        parser.add_argument("--defaults", default=False, action="store_true", help="show fields with default values")
+        return parser
+
+    parser_view = subparsers.add_parser("view", parents=[parser_common], help="view config.pbtxt contents")
+    parser_view = add_view_args(parser_view)
+    parser_view.set_defaults(func=cfg_view)
+
+    parser_edit = subparsers.add_parser("edit", parents=[parser_common], help="edit config.pbtxt contents")
+    parser_edit.add_argument("--copy", metavar="dir", default=False, const=True, nargs='?', type=str,
+        help="make a copy of config.pbtxt instead of editing in place ([dir] = output path for copy; if omitted, current directory is used)"
+    )
+    parser_edit.add_argument("--view", default=False, action="store_true", help="view file after editing")
+    parser_edit = add_view_args(parser_edit)
+    parser_edit, edit_dests = add_edit_args(parser_edit, model_info)
+    parser_edit.set_defaults(func=cfg_edit)
+
+    args = parser.parse_args()
+    args.model = model
+    args.model_info = model_info
+    if edit_dests is not None:
+        args.edit_dests = edit_dests
+
+    if hasattr(args,'config'):
+        with open(args.config,'r') as infile:
+            text_format.Parse(infile.read(), args.model)
+
+    args.func(args)

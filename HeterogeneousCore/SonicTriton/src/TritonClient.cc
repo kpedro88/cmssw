@@ -91,6 +91,16 @@ TritonClient::TritonClient(const edm::ParameterSet& params, const std::string& d
   //propagate batch size
   setBatchSize(1);
 
+  //check model version/checksum
+  bool correctVersion = false;
+  const auto& agents = modelConfig.model_repository_agents();
+  for (const auto& agent : agents) {
+    if (agent.name() == "checksum") {
+      const auto& params = agent.parameters();
+      const auto& checksum = params["checksum"];
+    }
+  }
+
   //get model info
   inference::ModelMetadataResponse modelMetadata;
   TRITON_THROW_IF_ERROR(client_->ModelMetadata(&modelMetadata, options_[0].model_name_, options_[0].model_version_),

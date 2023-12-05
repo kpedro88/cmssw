@@ -19,6 +19,8 @@ namespace triton_utils {
   bool checkType(inference::DataType dtype) {
     return false;
   }
+  //get MD5 checksum of file
+  std::string md5_file(const std::string& filename);
 }  // namespace triton_utils
 
 //explicit specializations (inlined)

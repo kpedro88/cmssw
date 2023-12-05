@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, json
+import os, sys, json, pathlib, shutil
 from collections import OrderedDict
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpFormatter, RawDescriptionHelpFormatter, Action
 from google.protobuf import text_format, json_format, message, descriptor
@@ -17,7 +17,10 @@ class ArgumentDefaultsRawHelpFormatter(
 pass
 
 class DictAction(Action):
+    val_type = None
     def __call__(self, parser, namespace, values, option_string=None):
+        if self.val_type is None:
+            self.val_type = self.type
         result = {}
         if len(values)%2!=0:
             parser.error("{} args must come in pairs".format(self.dest))
@@ -41,6 +44,12 @@ cpp_to_python = {
 checker_to_type = {val.__class__:cpp_to_python[key] for key,val in type_checkers._VALUE_CHECKERS.items()}
 # for some reason, this one is not in the map
 checker_to_type[type_checkers.UnicodeValueChecker] = str
+
+kind_to_int = {v.name:v.number for v in grpc.model_config_pb2._MODELINSTANCEGROUP_KIND.values}
+thread_control_parameters = {
+    "onnx": ["intra_op_thread_count", "inter_op_thread_count"],
+    "tensorflow": ["TF_NUM_INTRA_THREADS", "TF_NUM_INTER_THREADS", "TF_USE_PER_SESSION_THREADS"],
+}
 
 def get_type(obj):
     obj_type = obj.__class__.__name__
@@ -181,6 +190,30 @@ def add_edit_args(parser, model_info):
         dests[action.dest] = editor
     return parser, dests
 
+def get_checksum(filename, chunksize=4096):
+    import hashlib
+    with open(filename, 'rb') as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(chunksize):
+            file_hash.update(chunk)
+    return file_hash.hexdigest()
+
+def update_config(args):
+    # update config path to be output path (in case view is called)
+    if args.copy:
+        args.config = "config.pbtxt"
+        if isinstance(args.copy,str):
+            args.config = os.path.join(args.copy, args.config)
+
+    with open(args.config,'w') as outfile:
+        text_format.PrintMessage(args.model, outfile, use_short_repeated_primitives=True)
+
+def cfg_common(args):
+    args.model = grpc.model_config_pb2.ModelConfig()
+    if hasattr(args,'config'):
+        with open(args.config,'r') as infile:
+            text_format.Parse(infile.read(), args.model)
+
 def cfg_schema(args):
     get_fields(args.model, "ModelConfig", verbose=True)
 
@@ -189,30 +222,98 @@ def cfg_view(args):
     print_fields(args.model, args.model_info, json=args.json, defaults=args.defaults)
 
 def cfg_edit(args):
-    # todo
     for dest,editor,val in [(dest,editor,getattr(args,dest)) for dest,editor in args.edit_dests.items() if getattr(args,dest) is not None]:
         editor(args.model,dest,val)
 
-    # update config path to be output path (in case view is called)
-    if args.copy:
-        args.config = "config.pbtxt"
-        if isinstance(args.copy,str):
-            args.config = os.path.join(args.copy, args.config)
+    update_config(args)
 
-    with open(args.config,'w') as outfile:
-        text_format.PrintMessage(args.model, outfile)
-    
+    if args.view:
+        cfg_view(args)
+
+def cfg_checksum(args):
+    agents = args.model.model_repository_agents.agents
+    checksum_agent = next((agent for agent in agents if agent.name=="checksum"), None)
+    if checksum_agent is None:
+        checksum_agent = agents.add(name="checksum")
+
+    incorrect = []
+    missing = []
+
+    from glob import glob
+    config_dir = os.path.dirname(args.config)
+    for filename in glob(os.path.join(config_dir,"*/*")):
+        checksum = get_checksum(filename)
+        # key = filename relative to config.pbtxt dir
+        filename = os.path.relpath(filename, config_dir)
+        print(filename,checksum)
+        if filename in checksum_agent.parameters and checksum!=checksum_agent.parameters[filename]:
+            incorrect.append(filename)
+        elif filename not in checksum_agent.parameters:
+            missing.append(filename)
+        else:
+            continue
+        if args.update:
+            checksum_agent[filename] = checksum
+
+    if len(incorrect)>0 or len(missing)>0:
+        if not args.quiet:
+            if len(incorrect)>0:
+                print("\n".join(["Incorrect checksums:"]+incorrect))
+            if len(missing)>0:
+                print("\n".join(["Missing checksums:"]+missing))
+        if args.update:
+            update_config(args)
+        else:
+            sys.exit(1)
+
+    if args.view:
+        cfg_view(args)
+
+def cfg_threadcontrol(args):
+    # copy the entire model, not just config.pbtxt
+    config_dir = os.path.dirname(args.config)
+    copy_dir = args.copy
+    new_config_dir = os.path.join(copy_dir, pathlib.Path(config_dir).name)
+    shutil.copytree(config_dir, new_config_dir)
+
+    platform = args.model.platform
+    if platform=="ensemble":
+        repo_dir = pathlib.Path(config_dir).parent
+        for step in args.model.ensemble_scheduling.step:
+            # update args and run recursively
+            args.config = os.path.join(repo_dir,step.model_name,"config.pbtxt")
+            args.copy = copy_dir
+            cfg_common(args)
+            cfg_threadcontrol(args)
+        return
+
+    # is it correct to do this even if found_params is false at the end?
+    args.model.instance_group.add(count=args.nThreads, kind=kind_to_int['KIND_CPU'])
+
+    found_params = False
+    for key,val in thread_control_parameters.items():
+        if key in platform: # partial matching
+            for param in val:
+                item = args.model.parameters.get_or_create(key)
+                item.string_value = "1"
+            found_params = True
+            break
+    if not found_params:
+        print("Warning: thread (instance) control not implemented for {}".format(platform))
+
+    args.copy = new_config_dir
+    update_config(args)
+
     if args.view:
         cfg_view(args)
 
 if __name__=="__main__":
     # initial common operations
-    model = grpc.model_config_pb2.ModelConfig()
-    model_info = get_fields(model, "ModelConfig")
+    model_info = get_fields(grpc.model_config_pb2.ModelConfig(), "ModelConfig")
     edit_dests = None
 
-    parser_common = ArgumentParser(add_help=False)
-    parser_common.add_argument("-c", "--config", type=str, default="", required=True, help="path to input config.pbtxt file")
+    _parser_common = ArgumentParser(add_help=False)
+    _parser_common.add_argument("-c", "--config", type=str, default="", required=True, help="path to input config.pbtxt file")
 
     parser = ArgumentParser(formatter_class=ArgumentDefaultsRawHelpFormatter)
     subparsers = parser.add_subparsers(dest="command")
@@ -223,32 +324,44 @@ if __name__=="__main__":
     )
     parser_schema.set_defaults(func=cfg_schema)
 
-    def add_view_args(parser):
-        parser.add_argument("--json", default=False, action="store_true", help="display in json format")
-        parser.add_argument("--defaults", default=False, action="store_true", help="show fields with default values")
-        return parser
+    _parser_view_args = ArgumentParser(add_help=False)
+    _parser_view_args.add_argument("--json", default=False, action="store_true", help="display in json format")
+    _parser_view_args.add_argument("--defaults", default=False, action="store_true", help="show fields with default values")
 
-    parser_view = subparsers.add_parser("view", parents=[parser_common], help="view config.pbtxt contents")
-    parser_view = add_view_args(parser_view)
+    parser_view = subparsers.add_parser("view", parents=[_parser_common, _parser_view_args], help="view config.pbtxt contents")
     parser_view.set_defaults(func=cfg_view)
 
-    parser_edit = subparsers.add_parser("edit", parents=[parser_common], help="edit config.pbtxt contents")
-    parser_edit.add_argument("--copy", metavar="dir", default=False, const=True, nargs='?', type=str,
+    _parser_copy_view = ArgumentParser(add_help=False)
+    _parser_copy_view.add_argument("--view", default=False, action="store_true", help="view file after editing")
+
+    _parser_copy = ArgumentParser(add_help=False, parents=[_parser_copy_view])
+    _parser_copy.add_argument("--copy", metavar="dir", default=False, const=True, nargs='?', type=str,
         help="make a copy of config.pbtxt instead of editing in place ([dir] = output path for copy; if omitted, current directory is used)"
     )
-    parser_edit.add_argument("--view", default=False, action="store_true", help="view file after editing")
-    parser_edit = add_view_args(parser_edit)
+
+    parser_edit = subparsers.add_parser("edit", parents=[_parser_common, _parser_copy, _parser_view_args], help="edit config.pbtxt contents")
     parser_edit, edit_dests = add_edit_args(parser_edit, model_info)
     parser_edit.set_defaults(func=cfg_edit)
 
+    parser_checksum = subparsers.add_parser("checksum", parents=[_parser_common, _parser_copy, _parser_view_args], help="handle model file checksums")
+    parser_checksum.add_argument("--update", default=False, action="store_true", help="update checksums in config.pbtxt")
+    parser_checksum.add_argument("--quiet", default=False, action="store_true", help="suppress printouts")
+    parser_checksum.set_defaults(func=cfg_checksum)
+
+    _parser_copy_req = ArgumentParser(add_help=False, parents=[_parser_copy_view])
+    _parser_copy_req.add_argument("--copy", metavar="dir", type=str, required=True,
+        help="local model repository directory to copy model(s)"
+    )
+
+    parser_threadcontrol = subparsers.add_parser("threadcontrol", parents=[_parser_common, _parser_copy_req, _parser_view_args], help="enable thread controls")
+    parser_threadcontrol.add_argument("--nThreads", type=int, required=True, help="number of threads")
+    parser_threadcontrol.set_defaults(func=cfg_threadcontrol)
+
     args = parser.parse_args()
-    args.model = model
     args.model_info = model_info
     if edit_dests is not None:
         args.edit_dests = edit_dests
 
-    if hasattr(args,'config'):
-        with open(args.config,'r') as infile:
-            text_format.Parse(infile.read(), args.model)
+    cfg_common(args)
 
     args.func(args)

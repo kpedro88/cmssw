@@ -1,7 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 from RecoVertex.Configuration.RecoVertex_cff import unsortedOfflinePrimaryVertices, trackWithVertexRefSelector, trackRefsForJets, sortedPrimaryVertices, offlinePrimaryVertices, offlinePrimaryVerticesWithBS,vertexrecoTask
 
-from RecoVertex.PrimaryVertexProducer.TkClusParameters_cff import DA2D_vectParameters
+from RecoVertex.PrimaryVertexProducer.OfflinePrimaryVertices_cfi import DA2D_vectParameters
 
 unsortedOfflinePrimaryVertices4D = unsortedOfflinePrimaryVertices.clone(
     TkClusParameters = DA2D_vectParameters,

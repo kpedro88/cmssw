@@ -1,36 +1,19 @@
 import FWCore.ParameterSet.Config as cms
 from RecoVertex.Configuration.RecoVertex_cff import unsortedOfflinePrimaryVertices, trackWithVertexRefSelector, trackRefsForJets, sortedPrimaryVertices, offlinePrimaryVertices, offlinePrimaryVerticesWithBS,vertexrecoTask
 
-from RecoVertex.PrimaryVertexProducer.OfflinePrimaryVertices_cfi import DA2D_vectParameters
-
 unsortedOfflinePrimaryVertices4D = unsortedOfflinePrimaryVertices.clone(
-    TkClusParameters = DA2D_vectParameters,
+    TkClusParameters = dict(
+        algorithm = "DA2D_vect", 
+        TkDAClusParameters = dict(
+            Tmin = 4.0, 
+            Tpurge = 4.0, 
+            Tstop = 2.0
+        ),
+    ),
     TrackTimesLabel = cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModel"),
     TrackTimeResosLabel = cms.InputTag("trackTimeValueMapProducer","generalTracksConfigurableFlatResolutionModelResolution"),
-    vertexCollections = cms.VPSet(
-        cms.PSet(
-            algorithm = cms.string('AdaptiveVertexFitter'),
-            chi2cutoff = cms.double(2.5),
-            label = cms.string(''),
-            maxDistanceToBeam = cms.double(1.0),
-            minNdof = cms.double(0.0),
-            useBeamConstraint = cms.bool(False),
-            vertexTimeParameters = cms.PSet(
-                algorithm = cms.string('legacy4D')
-            )
-        ),
-        cms.PSet(
-            algorithm = cms.string('AdaptiveVertexFitter'),
-            chi2cutoff = cms.double(2.5),
-            label = cms.string('WithBS'),
-            maxDistanceToBeam = cms.double(1.0),
-            minNdof = cms.double(2.0),
-            useBeamConstraint = cms.bool(True),
-            vertexTimeParameters = cms.PSet(
-                algorithm = cms.string('legacy4D')
-            )
-        )
-    )
+    vertexCollections = {0: dict(vertexTimeParameters = cms.PSet( algorithm = cms.string('legacy4D'))),
+                         1: dict(vertexTimeParameters = cms.PSet( algorithm = cms.string('legacy4D')))}
 )
 trackWithVertexRefSelectorBeforeSorting4D = trackWithVertexRefSelector.clone(
     vertexTag = "unsortedOfflinePrimaryVertices4D",
@@ -86,29 +69,7 @@ from Configuration.Eras.Modifier_phase2_timing_layer_cff import phase2_timing_la
 phase2_timing_layer.toModify(tofPID, vtxsSrc='unsortedOfflinePrimaryVertices4D', vertexReassignment=False)
 phase2_timing_layer.toModify(tofPID3D, vertexReassignment=False)
 phase2_timing_layer.toModify(unsortedOfflinePrimaryVertices, 
-    vertexCollections = cms.VPSet(
-        cms.PSet(
-            algorithm = cms.string('AdaptiveVertexFitter'),
-            chi2cutoff = cms.double(2.5),
-            label = cms.string(''),
-            maxDistanceToBeam = cms.double(1.0),
-            minNdof = cms.double(0.0),
-            useBeamConstraint = cms.bool(False),
-            vertexTimeParameters = cms.PSet(
-                algorithm = cms.string('fromTracksPID')
-            )
-        ),
-        cms.PSet(
-            algorithm = cms.string('AdaptiveVertexFitter'),
-            chi2cutoff = cms.double(2.5),
-            label = cms.string('WithBS'),
-            maxDistanceToBeam = cms.double(1.0),
-            minNdof = cms.double(2.0),
-            useBeamConstraint = cms.bool(True),
-            vertexTimeParameters = cms.PSet(
-                algorithm = cms.string('fromTracksPID')
-            )
-        )
-    )
+    vertexCollections = {0: dict(vertexTimeParameters = cms.PSet( algorithm = cms.string('fromTracksPID'))),
+                         1: dict(vertexTimeParameters = cms.PSet( algorithm = cms.string('fromTracksPID')))}
 )
 

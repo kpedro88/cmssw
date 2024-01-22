@@ -1548,6 +1548,6 @@ void DAClusterizerInZ_vect::fillPSetDescription(edm::ParameterSetDescription& de
   desc.add<double>("uniquetrkminp", 0.0);
   desc.add<double>("zrange", 4.0);
   desc.add<bool>("runInBlocks", false);
-  desc.add<unsigned int>("block_size", 512);
-  desc.add<double>("overlap_frac", 0.5);
+  desc.add<unsigned int>("block_size", 10000);
+  desc.add<double>("overlap_frac", 0.0);
 }

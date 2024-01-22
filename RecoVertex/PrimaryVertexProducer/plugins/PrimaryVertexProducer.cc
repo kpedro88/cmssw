@@ -391,7 +391,7 @@ void PrimaryVertexProducer::fillDescriptions(edm::ConfigurationDescriptions& des
   {
     edm::ParameterSetDescription psd0;
     TrackFilterForPVFinding::fillPSetDescription(psd0);
-    HITrackFilterForPVFinding::fillPSetDescription(psd0); // HI only
+    HITrackFilterForPVFinding::fillPSetDescription(psd0);  // HI only
     desc.add<edm::ParameterSetDescription>("TkFilterParameters", psd0);
   }
   desc.add<edm::InputTag>("beamSpotLabel", edm::InputTag("offlineBeamSpot"));

@@ -1560,7 +1560,7 @@ void DAClusterizerInZT_vect::dump(const double beta, const vertex_t& y, const tr
 
 void DAClusterizerInZT_vect::fillPSetDescription(edm::ParameterSetDescription& desc) {
   DAClusterizerInZ_vect::fillPSetDescription(desc);
-  desc.add<double>("tmerge", 0.01);           // 4D only
+  desc.add<double>("tmerge", 0.1);            // 4D only
   desc.add<double>("dtCutOff", 4.);           // 4D only
   desc.add<double>("t0Max", 1.0);             // 4D only
   desc.add<double>("vertexSizeTime", 0.008);  // 4D only

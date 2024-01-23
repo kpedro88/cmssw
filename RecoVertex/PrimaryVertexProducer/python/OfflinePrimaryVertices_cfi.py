@@ -84,11 +84,8 @@ from Configuration.ProcessModifiers.pp_on_AA_cff import pp_on_AA
                    maxNumTracksThreshold = cms.int32(1000),
                    minPtTight = cms.double(1.0)
                ),
-               TkClusParameters = cms.PSet(
-                 algorithm = cms.string("gap"),
-                 TkGapClusParameters = cms.PSet(
-                   zSeparation = cms.double(1.0)        
-                 )
+               TkClusParameters = dict(
+                 algorithm = "gap"
                )
 )
     

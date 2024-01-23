@@ -55,7 +55,9 @@
 #include "Geometry/TrackerGeometryBuilder/interface/PixelTopologyMap.h"
 #include "Geometry/Records/interface/TrackerTopologyRcd.h"
 #include "RecoVertex/PrimaryVertexProducer/interface/TrackFilterForPVFinding.h"
+#include "RecoVertex/PrimaryVertexProducer/interface/HITrackFilterForPVFinding.h"
 #include "RecoVertex/PrimaryVertexProducer/interface/DAClusterizerInZ_vect.h"
+#include "RecoVertex/PrimaryVertexProducer/interface/DAClusterizerInZT_vect.h"
 #include "RecoVertex/PrimaryVertexProducer/interface/GapClusterizerInZ.h"
 #include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrack.h"
@@ -3694,7 +3696,7 @@ void PrimaryVertexValidation::fillDescriptions(edm::ConfigurationDescriptions& d
   // track filtering
   edm::ParameterSetDescription psd0;
   TrackFilterForPVFinding::fillPSetDescription(psd0);
-  psd0.add<int>("numTracksThreshold", 0);  // HI only
+  HITrackFilterForPVFinding::fillPSetDescription(psd0);  // HI only
   desc.add<edm::ParameterSetDescription>("TkFilterParameters", psd0);
 
   // PV Clusterization
@@ -3702,7 +3704,7 @@ void PrimaryVertexValidation::fillDescriptions(edm::ConfigurationDescriptions& d
     edm::ParameterSetDescription psd0;
     {
       edm::ParameterSetDescription psd1;
-      DAClusterizerInZ_vect::fillPSetDescription(psd1);
+      DAClusterizerInZT_vect::fillPSetDescription(psd1);
       psd0.add<edm::ParameterSetDescription>("TkDAClusParameters", psd1);
 
       edm::ParameterSetDescription psd2;

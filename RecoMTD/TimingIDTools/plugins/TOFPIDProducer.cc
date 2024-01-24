@@ -50,17 +50,17 @@ private:
   edm::EDGetTokenT<edm::ValueMap<float>> tofpToken_;
   edm::EDGetTokenT<reco::VertexCollection> vtxsToken_;
   edm::EDGetTokenT<edm::ValueMap<float>> trackMTDTimeQualityToken_;
-  double vtxMaxSigmaT_;
-  double maxDz_;
-  double maxDtSignificance_;
-  double minProbHeavy_;
-  double fixedT0Error_;
-  double probPion_;
-  double probKaon_;
-  double probProton_;
-  double minTrackTimeQuality_;
-  bool MVASel_;
-  bool vertexReassignment_;
+  const double vtxMaxSigmaT_;
+  const double maxDz_;
+  const double maxDtSignificance_;
+  const double minProbHeavy_;
+  const double fixedT0Error_;
+  const double probPion_;
+  const double probKaon_;
+  const double probProton_;
+  const double minTrackTimeQuality_;
+  const bool MVASel_;
+  const bool vertexReassignment_;
 };
 
 TOFPIDProducer::TOFPIDProducer(const ParameterSet& iConfig)

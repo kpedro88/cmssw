@@ -399,41 +399,23 @@ auto_stop(){
 	if [ -n "$1" ]; then VERBOSE="$VERBOSE_ARGS"; fi
 	PARENTPID="$2"
 
+	PARENTEXIT=0
 	if [ -n "$PARENTPID" ]; then
 		if [ -n "$VERBOSE" ]; then
 			echo "watching PID $PARENTPID"
 			ps
 		fi
-		PCOUNTER=0
-		PMAX=5
-		while [ "$PCOUNTER" -le "$PMAX" ]; do
-			if ! kill -0 $PARENTPID >& /dev/null; then
-				PCOUNTER=$((PCOUNTER+1))
-				if [ -n "$VERBOSE" ]; then
-					echo "trigger $PCOUNTER:"
-					ps
-				fi
-			else
-				# must get N in a row, otherwise reset
-				if [ "$PCOUNTER" -gt 0 ] && [ -n "$VERBOSE" ]; then
-					echo "reset:"
-					ps
-				fi
-				PCOUNTER=0
-			fi
-			sleep 1
-		done
+		wait $PARENTPID
+		PARENTEXIT=$?
 	fi
 	$STOP_FN
 
 	# move logs out of tmp dir
-	if [ -z "$DRYRUN" ]; then
-		if [ -n "$VERBOSE" ]; then
-			mv "$LOG" "$TOPDIR"
-			# only keep non-empty log
-			if [ -s "$STOPLOG" ]; then
-				mv "$STOPLOG" "$TOPDIR"
-			fi
+	if [ -z "$DRYRUN" ] && ( [ -n "$VERBOSE" ] || [ $PARENTEXIT -ne 0 ] ); then
+		mv "$LOG" "$TOPDIR"
+		# only keep non-empty log
+		if [ -s "$STOPLOG" ]; then
+			mv "$STOPLOG" "$TOPDIR"
 		fi
 	fi
 

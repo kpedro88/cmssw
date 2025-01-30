@@ -60,12 +60,23 @@ premix_stage1.toModify(mixSimHits,
 
 # fastsim customs
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
+from Configuration.ProcessModifiers.fastSimPU_cff import fastSimPU
 fastSim.toModify(mixSimHits,
     input = ["MuonSimHits:MuonCSCHits", 
              "MuonSimHits:MuonDTHits", 
              "MuonSimHits:MuonRPCHits", 
              "fastSimProducer:TrackerHits"],
     subdets = ['MuonCSCHits', 
+               'MuonDTHits', 
+               'MuonRPCHits', 
+               'TrackerHits']
+)
+fastSimPU.toModify(mixSimHits,
+    input =  mixSimHits.input+["MuonSimHits:MuonCSCHits", 
+               "MuonSimHits:MuonDTHits", 
+               "MuonSimHits:MuonRPCHits", 
+               "fastSimProducer:TrackerHits"],
+    subdets = mixSimHits.subdets+['MuonCSCHits', 
                'MuonDTHits', 
                'MuonRPCHits', 
                'TrackerHits']
@@ -97,7 +108,7 @@ mixCaloHits = cms.PSet(
 )
 
 # fastsim customs
-fastSim.toModify(mixCaloHits,
+(fastSim | fastSimPU).toModify(mixCaloHits,
     input = ["fastSimProducer:EcalHitsEB",
              "fastSimProducer:EcalHitsEE",
              "fastSimProducer:EcalHitsES",
@@ -123,6 +134,8 @@ mixSimVertices = cms.PSet(
 # fastsim customs
 fastSim.toModify(mixSimTracks, input = ["fastSimProducer"])
 fastSim.toModify(mixSimVertices, input = ["fastSimProducer"])
+fastSimPU.toModify(mixSimTracks, input = mixSimTracks.input + ["fastSimProducer"])
+fastSimPU.toModify(mixSimVertices, input = mixSimVertices.input + ["fastSimProducer"])
     
 mixHepMCProducts = cms.PSet(
     makeCrossingFrame = cms.untracked.bool(True),
@@ -155,7 +168,7 @@ theMixObjects = cms.PSet(
 )
 
 # fastsim customs
-fastSim.toModify(theMixObjects, mixRecoTracks = cms.PSet(mixReconstructedTracks))
+(fastSim | fastSimPU).toModify(theMixObjects, mixRecoTracks = cms.PSet(mixReconstructedTracks))
     
 mixPCFSimHits = cms.PSet(
     input = cms.VInputTag(cms.InputTag("CFWriter","g4SimHitsBSCHits"), cms.InputTag("CFWriter","g4SimHitsBCM1FHits"), cms.InputTag("CFWriter","g4SimHitsPLTHits"), cms.InputTag("CFWriter","g4SimHitsFP420SI"), cms.InputTag("CFWriter","g4SimHitsMuonCSCHits"), cms.InputTag("CFWriter","g4SimHitsMuonDTHits"), cms.InputTag("CFWriter","g4SimHitsMuonRPCHits"), 

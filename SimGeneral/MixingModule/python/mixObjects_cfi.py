@@ -61,22 +61,12 @@ premix_stage1.toModify(mixSimHits,
 # fastsim customs
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
 from Configuration.ProcessModifiers.fastSimPU_cff import fastSimPU
-fastSim.toModify(mixSimHits,
+(fastSim | fastSimPU).toModify(mixSimHits,
     input = ["MuonSimHits:MuonCSCHits", 
              "MuonSimHits:MuonDTHits", 
              "MuonSimHits:MuonRPCHits", 
              "fastSimProducer:TrackerHits"],
     subdets = ['MuonCSCHits', 
-               'MuonDTHits', 
-               'MuonRPCHits', 
-               'TrackerHits']
-)
-fastSimPU.toModify(mixSimHits,
-    input =  mixSimHits.input+["MuonSimHits:MuonCSCHits", 
-               "MuonSimHits:MuonDTHits", 
-               "MuonSimHits:MuonRPCHits", 
-               "fastSimProducer:TrackerHits"],
-    subdets = mixSimHits.subdets+['MuonCSCHits', 
                'MuonDTHits', 
                'MuonRPCHits', 
                'TrackerHits']

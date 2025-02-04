@@ -90,7 +90,8 @@ run2_common.toModify( simMuonCSCDigis.strips, bunchTimingOffsets=[0.0, 37.53, 37
 run2_common.toModify( simMuonCSCDigis.wires, bunchTimingOffsets=[0.0, 22.88, 22.55, 29.28, 30.0, 30.0, 30.5, 31.0, 29.5, 29.1, 29.88] )
 
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
-fastSim.toModify(simMuonCSCDigis, InputCollection = 'MuonSimHitsMuonCSCHits')
+from Configuration.ProcessModifiers.fastSimPU_cff import fastSimPU
+(fastSim | fastSimPU).toModify(simMuonCSCDigis, InputCollection = 'MuonSimHitsMuonCSCHits')
 
 from Configuration.ProcessModifiers.premix_stage2_cff import premix_stage2
 premix_stage2.toModify(simMuonCSCDigis, mixLabel = "mixData")

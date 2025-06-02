@@ -42,8 +42,7 @@ class FastHFShowerLibrary;
 class CalorimetryManager {
 public:
   CalorimetryManager();
-  CalorimetryManager(FSimEvent* aSimEvent,
-                     const edm::ParameterSet& fastCalo,
+  CalorimetryManager(const edm::ParameterSet& fastCalo,
                      const edm::ParameterSet& MuonECALPars,
                      const edm::ParameterSet& MuonHCALPars,
                      const edm::ParameterSet& fastGflash,
@@ -51,9 +50,8 @@ public:
   ~CalorimetryManager();
 
   // Does the real job
-  void initialize(RandomEngineAndDistribution const* random);
+  void initialize(RandomEngineAndDistribution const* random, const HepPDT::ParticleDataTable* pdt);
   void reconstructTrack(const FSimTrack& myTrack, RandomEngineAndDistribution const*);
-  void reconstruct(RandomEngineAndDistribution const*);
 
   // Return the address of the Calorimeter
   CaloGeometryHelper* getCalorimeter() const { return myCalorimeter_.get(); }
@@ -97,7 +95,6 @@ private:
   void clean();
 
 private:
-  FSimEvent* mySimEvent_;
   std::unique_ptr<CaloGeometryHelper> myCalorimeter_;
 
   std::unique_ptr<HCALResponse> myHDResponse_;
@@ -124,11 +121,6 @@ private:
   std::vector<double> timeShiftHE_;
   std::vector<double> timeShiftHF_;
   std::vector<double> timeShiftHO_;
-
-  /// A few pointers to save time
-  RawParticle myElec_;
-  RawParticle myPosi_;
-  RawParticle myPart_;
 
   // Parameters
   double pulledPadSurvivalProbability_;
@@ -186,5 +178,6 @@ private:
   std::unique_ptr<FastHFShowerLibrary> theHFShowerLibrary_;
 
   std::unique_ptr<KKCorrectionFactors> ecalCorrection_;
+  const HepPDT::ParticleDataTable* pdt_;
 };
 #endif

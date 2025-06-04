@@ -200,9 +200,10 @@ void CalorimetryManager::reconstructTrack(FSimTrack& myTrack, RandomEngineAndDis
         EMShowerSimulation(myTrack, random);
       else if (myTrack.onVFcal()) {
         if (useShowerLibrary) {
-          theHFShowerLibrary->recoHFShowerLibrary(myTrack);
+          HFHitMaker myHits;
+          theHFShowerLibrary->recoHFShowerLibrary(myTrack, &myHits);
           myHDResponse_->correctHF(myTrack.hcalEntrance().e(), abs(myTrack.type()));
-          updateHCAL(theHFShowerLibrary->getHitsMap(), myTrack.id());
+          updateHCAL(myHits.hitMap(), myTrack.id());
         } else
           reconstructHCAL(myTrack, random);
       }
@@ -576,6 +577,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
     myGrid.setTrackParameters(direction, 0, myTrack);
     // Build the FAMOS HCAL
     HcalHitMaker myHcalHitMaker(myGrid, (unsigned)1);
+    HFHitMaker myHFHitMaker;
 
     // Shower simulation
     bool status = false;
@@ -587,7 +589,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
       //           For HF, the resolution is due to the PE statistic
 
       if (useShowerLibrary) {
-        theHFShowerLibrary->recoHFShowerLibrary(myTrack);
+        theHFShowerLibrary->recoHFShowerLibrary(myTrack, &myHFHitMaker);
         status = true;
       } else {
         HFShower theShower(random, &theHDShowerparam, &myGrid, &myHcalHitMaker, onECAL, eGen);
@@ -699,7 +701,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
       // Save HCAL hits
       if (myTrack.onVFcal() && useShowerLibrary) {
         myHDResponse_->correctHF(eGen, abs(myTrack.type()));
-        updateHCAL(theHFShowerLibrary->getHitsMap(), myTrack.id());
+        updateHCAL(myHFHitMaker.hitMap(), myTrack.id());
       } else
         updateHCAL(myHcalHitMaker.getHits(), myTrack.id(), correction * hcorr);
 

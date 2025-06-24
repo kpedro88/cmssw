@@ -150,8 +150,8 @@ void CalorimetryManager::reconstructTrack(const FSimTrack& myTrack, RandomEngine
         if (useShowerLibrary_) {
           HFHitMaker myHits;
           theHFShowerLibrary_->recoHFShowerLibrary(myTrack, &myHits);
-          myHDResponse_->correctHF(myTrack.hcalEntrance().e(), abs(myTrack.type()));
-          updateHCAL(myHits.hitMap(), myTrack.id(), container);
+          const auto& hfcorr = myHDResponse_->correctHF(myTrack.hcalEntrance().e(), abs(myTrack.type()));
+          updateHCAL(myHits.hitMap(), myTrack.id(), container, 1., hfcorr.first, hfcorr.second);
         } else
           reconstructHCAL(myTrack, random, container);
       }
@@ -641,8 +641,8 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
 
       // Save HCAL hits
       if (myTrack.onVFcal() && useShowerLibrary_) {
-        myHDResponse_->correctHF(eGen, abs(myTrack.type()));
-        updateHCAL(myHFHitMaker.hitMap(), myTrack.id(), container);
+        const auto& hfcorr = myHDResponse_->correctHF(eGen, abs(myTrack.type()));
+        updateHCAL(myHFHitMaker.hitMap(), myTrack.id(), container, 1., hfcorr.first, hfcorr.second);
       } else
         updateHCAL(myHcalHitMaker.getHits(), myTrack.id(), container, correction * hcorr);
 
@@ -1029,9 +1029,7 @@ void CalorimetryManager::updateECAL(const std::map<CaloHitID, float>& hitMap, in
   }
 }
 
-void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, int trackID, CaloProductContainer& container, float corr) const {
-  const std::vector<double>& hfcorrEm = myHDResponse_->getCorrHFem();
-  const std::vector<double>& hfcorrHad = myHDResponse_->getCorrHFhad();
+void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, int trackID, CaloProductContainer& container, float corr, const std::vector<double>& hfcorrEm, const std::vector<double>& hfcorrHad) const {
   container.hitsHCAL->reserve(container.hitsHCAL->size() + hitMap.size());
   for (const auto& hit : hitMap) {
     //correct energy
@@ -1051,15 +1049,15 @@ void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, in
       } else if (hdetid.subdetId() == HcalForward) {
         if (useShowerLibrary_) {
           if (useCorrectionSL_) {
-            if (hdetid.depth() == 1 or hdetid.depth() == 3)
+            if ((hdetid.depth() == 1 or hdetid.depth() == 3) and !hfcorrEm.empty())
               energy *= hfcorrEm[hdetid.ietaAbs() - ietaShiftHF_];
-            if (hdetid.depth() == 2 or hdetid.depth() == 4)
+            else if ((hdetid.depth() == 2 or hdetid.depth() == 4) and !hfcorrHad.empty())
               energy *= hfcorrHad[hdetid.ietaAbs() - ietaShiftHF_];
           }
         } else {
           if (hdetid.depth() == 1 or hdetid.depth() == 3)
             energy *= samplingHF_[0];
-          if (hdetid.depth() == 2 or hdetid.depth() == 4)
+          else if (hdetid.depth() == 2 or hdetid.depth() == 4)
             energy *= samplingHF_[1];
           time = timeShiftHF_[hdetid.ietaAbs() - ietaShiftHF_];
         }

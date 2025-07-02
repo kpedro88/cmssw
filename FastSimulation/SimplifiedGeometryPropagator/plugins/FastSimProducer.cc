@@ -139,12 +139,11 @@ private:
   void produce(edm::StreamID, edm::Event&, const edm::EventSetup&) const;
   void globalEndRun(const edm::Run& iRun, const edm::EventSetup& iSetup) const {}
   void endStream(edm::StreamID) const;
-  void createFSimTrack(fastsim::Particle* particle,
-                       fastsim::ParticleManager* particleManager,
-                       HepPDT::ParticleDataTable const& particleTable,
-                       std::vector<FSimTrack>& myFSimTracks,
-                       const GeometryDependentObjects* geometries,
-                       FastSimState* state) const;
+  FSimTrack createFSimTrack(fastsim::Particle* particle,
+                            fastsim::ParticleManager* particleManager,
+                            HepPDT::ParticleDataTable const& particleTable,
+                            const GeometryDependentObjects* geometries,
+                            FastSimState* state) const;
 
   edm::ParameterSet iConfig_;
   edm::EDGetTokenT<edm::HepMCProduct> genParticlesToken_;  //!< Token to get the genParticles
@@ -231,9 +230,10 @@ void FastSimProducer::produce(edm::StreamID id, edm::Event& iEvent, const edm::E
   auto geometries = runCache(iEvent.getRun().index());
   auto state = streamCache(id);
 
-  // Define containers for SimTracks, SimVertices
+  // Define containers for SimTracks, SimVertices, CaloHits
   auto simTracks = std::make_unique<edm::SimTrackContainer>();
   auto simVertices = std::make_unique<edm::SimVertexContainer>();
+  auto caloProducts = std::make_unique<CaloProductContainer>();
 
   // Get the particle data table (in case lifetime or charge of GenParticles not set)
   auto const& pdt = iSetup.getData(particleDataTableESToken_);
@@ -252,9 +252,6 @@ void FastSimProducer::produce(edm::StreamID id, edm::Event& iEvent, const edm::E
                                            *simTracks,
                                            *simVertices,
                                            useFastSimDecayer_);
-
-  // The vector of SimTracks needed for the CalorimetryManager
-  std::vector<FSimTrack> myFSimTracks;
 
   LogDebug(MESSAGECATEGORY) << "################################"
                             << "\n###############################";
@@ -353,11 +350,10 @@ void FastSimProducer::produce(edm::StreamID id, edm::Event& iEvent, const edm::E
       LogDebug(MESSAGECATEGORY) << "\n   moving particle to calorimetry: " << *particle;
 
       // create FSimTrack (this is the object the old propagation uses)
-      createFSimTrack(particle.get(), &particleManager, pdt, myFSimTracks, geometries, state);
-      // particle was decayed
-      if (!particle->isStable() && particle->remainingProperLifeTimeC() < minParticleLifetime_) {
-        continue;
-      }
+      // and immediately reconstruct it
+      const auto& myTrack = createFSimTrack(particle.get(), &particleManager, pdt, geometries, state);
+      if (simulateCalorimetry_)
+        geometries->myCalorimetry->reconstructTrack(myTrack, state->randomEngine.get(), *caloProducts, state->myCaloState);
 
       LogDebug(MESSAGECATEGORY) << "################################"
                                 << "\n###############################";
@@ -380,16 +376,6 @@ void FastSimProducer::produce(edm::StreamID id, edm::Event& iEvent, const edm::E
   }
 
   // -----------------------------
-  // Calorimetry Manager
-  // -----------------------------
-  auto caloProducts = std::make_unique<CaloProductContainer>();
-  if (simulateCalorimetry_) {
-    for (const auto& myFSimTrack : myFSimTracks) {
-      geometries->myCalorimetry->reconstructTrack(myFSimTrack, state->randomEngine.get(), *caloProducts, state->myCaloState);
-    }
-  }
-
-  // -----------------------------
   // Store Hits
   // -----------------------------
   iEvent.put(std::move(caloProducts->hitsEB), "EcalHitsEB");
@@ -401,14 +387,12 @@ void FastSimProducer::produce(edm::StreamID id, edm::Event& iEvent, const edm::E
 
 void FastSimProducer::endStream(edm::StreamID id) const { streamCache(id)->randomEngine.reset(); }
 
-void FastSimProducer::createFSimTrack(fastsim::Particle* particle,
-                                      fastsim::ParticleManager* particleManager,
-                                      HepPDT::ParticleDataTable const& particleTable,
-                                      std::vector<FSimTrack>& myFSimTracks,
-                                      const GeometryDependentObjects* geometries,
-                                      FastSimState* state) const {
-  auto& myFSimTrack = myFSimTracks.emplace_back(
-                        particle->pdgId(),
+FSimTrack FastSimProducer::createFSimTrack(fastsim::Particle* particle,
+                                           fastsim::ParticleManager* particleManager,
+                                           HepPDT::ParticleDataTable const& particleTable,
+                                           const GeometryDependentObjects* geometries,
+                                           FastSimState* state) const {
+  FSimTrack myFSimTrack(particle->pdgId(),
                         particleManager->getSimTrack(particle->simTrackIndex()).momentum(),
                         particle->simVertexIndex(),
                         particle->genParticleIndex(),
@@ -539,6 +523,8 @@ void FastSimProducer::createFSimTrack(fastsim::Particle* particle,
     LogDebug(MESSAGECATEGORY) << "   decay has " << secondaries.size() << " products";
     particleManager->addSecondaries(particle->position(), particle->simTrackIndex(), secondaries);
   }
+
+  return myFSimTrack;
 }
 
 DEFINE_FWK_MODULE(FastSimProducer);

@@ -43,6 +43,8 @@ namespace edm {
 
     bool operator==(InputTag const& tag) const;
 
+    bool empty() const;
+
     ProductResolverIndex indexFor(TypeID const& typeID, BranchType branchType, void const* productRegistry) const;
 
     void tryToCacheIndex(ProductResolverIndex index,

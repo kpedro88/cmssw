@@ -186,6 +186,10 @@ namespace edm {
     return ProductResolverIndexInvalid;
   }
 
+  bool InputTag::empty() const {
+    return label_.empty() and instance_.empty() and process_.empty();
+  }
+
   void InputTag::tryToCacheIndex(ProductResolverIndex index,
                                  TypeID const& typeID,
                                  BranchType branchType,

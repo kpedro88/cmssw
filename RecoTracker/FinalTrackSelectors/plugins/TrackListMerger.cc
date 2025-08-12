@@ -821,7 +821,7 @@ void TrackListMerger::produce(edm::Event& e, const edm::EventSetup& es) {
           }  //valid hit
         }  //nhit!=0
 
-        if (doRekeyOnThisSeed && !(clusterRemovalInfos == edm::InputTag(""))) {
+        if (doRekeyOnThisSeed && !clusterRemovalInfos.empty()) {
           ClusterRemovalRefSetter refSetter(e, clusterRemovalInfos);
           TrajectorySeed::RecHitContainer newRecHitContainer;
           newRecHitContainer.reserve(origSeedRef->nHits());

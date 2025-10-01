@@ -13,6 +13,7 @@ import json
 import sys
 import itertools
 import json
+import re
 
 ## Helpers
 base_cert_url = "https://cms-service-dqmdc.web.cern.ch/CAF/certification/"
@@ -144,34 +145,32 @@ if __name__ == '__main__':
             cert_type = "Collisions" + str(year) + "HI"
         
         cert_path = base_cert_cvmfs + cert_type + "/"
-        web_fallback = True
+        eos_fallback = False
+        web_fallback = False
 
         ## if we have access to cvmfs we get from there ...
         if os.path.isdir(cert_path):
             cert_path = cert_path + "/latest/"
-            web_fallback = False
             json_list = os.listdir(cert_path)
             if len(json_list) == 0:
-                web_fallback == True 
-            json_list = [c for c in json_list if "golden" in c.lower() and "era" not in c.lower() and "ppref" not in c.lower()]
-            json_list = [c for c in json_list if c.lower().startswith("cert_c") and c.endswith("json")]
-        
+                eos_fallback == True
+        else:
+            eos_fallback = True
         ## ... if not we try eos ...
-        if web_fallback and os.path.isdir(base_cert_eos + cert_type +"/"):
-            web_fallback = False
-            cert_path = base_cert_eos + cert_type +"/"
-            json_list = os.listdir(cert_path)
-            if len(json_list) == 0:
-                web_fallback == True 
-            json_list = [c for c in json_list if "golden" in c.lower() and "era" not in c.lower() and "ppref" not in c.lower()]
-            json_list = [c for c in json_list if c.lower().startswith("cert_c") and c.endswith("json")]
-
+        if eos_fallback:
+            if os.path.isdir(base_cert_eos + cert_type +"/"):
+                cert_path = base_cert_eos + cert_type +"/"
+                json_list = os.listdir(cert_path)
+                if len(json_list) == 0:
+                    web_fallback == True
+            else:
+                web_fallback = True
         ## ... if not we go to the website
         if web_fallback:
             cert_url = base_cert_url + cert_type + "/"
             json_list = get_url_clean(cert_url).split("\n")
-            json_list = [c for c in json_list if "golden" in c.lower() and "era" not in c.lower() and "cert_c" in c.lower() and "ppref" not in c.lower()]
-            json_list = [[cc for cc in c.split(" ") if cc.lower().startswith("cert_c") and cc.endswith("json")][0] for c in json_list]
+        pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)$", re.IGNORECASE)
+        json_list = [match.group(1) for entry in json_list for match in [re.search(pattern, entry)] if match]
 
         # the larger the better, assuming file naming schema 
         # Cert_X_RunStart_RunFinish_Type.json

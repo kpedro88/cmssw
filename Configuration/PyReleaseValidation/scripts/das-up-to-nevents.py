@@ -151,8 +151,8 @@ if __name__ == '__main__':
         ## if we have access to cvmfs we get from there ...
         if os.path.isdir(cert_path):
             cert_path = cert_path + "/latest/"
-            json_list = os.listdir(cert_path)
-            if len(json_list) == 0:
+            json_list_full = os.listdir(cert_path)
+            if len(json_list_full) == 0:
                 eos_fallback == True
         else:
             eos_fallback = True
@@ -160,17 +160,23 @@ if __name__ == '__main__':
         if eos_fallback:
             if os.path.isdir(base_cert_eos + cert_type +"/"):
                 cert_path = base_cert_eos + cert_type +"/"
-                json_list = os.listdir(cert_path)
-                if len(json_list) == 0:
+                json_list_full = os.listdir(cert_path)
+                if len(json_list_full) == 0:
                     web_fallback == True
             else:
                 web_fallback = True
         ## ... if not we go to the website
         if web_fallback:
             cert_url = base_cert_url + cert_type + "/"
-            json_list = get_url_clean(cert_url).split("\n")
+            json_list_full = get_url_clean(cert_url).split("\n")
         pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)$", re.IGNORECASE)
-        json_list = [match.group(1) for entry in json_list for match in [re.search(pattern, entry)] if match]
+        json_list = [match.group(1) for entry in json_list_full for match in [re.search(pattern, entry)] if match]
+        if len(json_list)==0:
+            raise RuntimeError("No matching JSON files found from {source} ({path}). The full list was:\n{list_full}".format(
+                source="web" if web_fallback else "eos" if eos_fallback else "cvmfs",
+                path=cert_url if web_fallback else cert_path,
+                list_full='\n'.join(json_list_full),
+            ))
 
         # the larger the better, assuming file naming schema 
         # Cert_X_RunStart_RunFinish_Type.json

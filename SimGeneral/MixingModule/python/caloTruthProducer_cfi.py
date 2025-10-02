@@ -57,10 +57,10 @@ run3_ecalclustering.toModify(
 )
 
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
-#fastSim.toReplaceWith(caloParticles, cms.PSet()) # don't allow this to run in fastsim
+fastSim.toReplaceWith(caloParticles, cms.PSet()) # don't allow this to run in fastsim
 
 from Configuration.Eras.Modifier_phase2_common_cff import phase2_common
-phase2_common.toModify(
+(phase2_common).toModify(
     caloParticles, 
     simHitCollections = cms.PSet(
         hgc = cms.VInputTag(
@@ -74,5 +74,4 @@ phase2_common.toModify(
         )
     )
 )
-
 

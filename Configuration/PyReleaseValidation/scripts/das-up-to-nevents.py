@@ -169,8 +169,8 @@ if __name__ == '__main__':
         if web_fallback:
             cert_url = base_cert_url + cert_type + "/"
             json_list_full = get_url_clean(cert_url).split("\n")
-        pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)$", re.IGNORECASE)
-        json_list = [match.group(1) for entry in json_list_full for match in [re.search(pattern, entry)] if match]
+        pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)\s|$", re.IGNORECASE)
+        json_list = [match.group(1) for entry in json_list_full for match in [re.search(pattern, entry)] if match and match.group(1)]
         if len(json_list)==0:
             raise RuntimeError("No matching JSON files found from {source} ({path}). The full list was:\n{list_full}".format(
                 source="web" if web_fallback else "eos" if eos_fallback else "cvmfs",

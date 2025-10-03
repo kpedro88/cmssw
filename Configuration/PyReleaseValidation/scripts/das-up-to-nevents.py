@@ -144,37 +144,29 @@ if __name__ == '__main__':
         elif "HI" in PD:
             cert_type = "Collisions" + str(year) + "HI"
         
-        cert_path = base_cert_cvmfs + cert_type + "/"
-        eos_fallback = False
-        web_fallback = False
-
+        cvmfs_path = base_cert_cvmfs + cert_type + "/"
+        eos_path = ""
+        web_path = ""
+        json_list_full = []
         ## if we have access to cvmfs we get from there ...
-        if os.path.isdir(cert_path):
-            cert_path = cert_path + "/latest/"
-            json_list_full = os.listdir(cert_path)
-            if len(json_list_full) == 0:
-                eos_fallback == True
-        else:
-            eos_fallback = True
+        if os.path.isdir(cvmfs_path):
+            cvmfs_path = cvmfs_path + "/latest/"
+            json_list_full = os.listdir(cvmfs_path)
         ## ... if not we try eos ...
-        if eos_fallback:
-            if os.path.isdir(base_cert_eos + cert_type +"/"):
-                cert_path = base_cert_eos + cert_type +"/"
-                json_list_full = os.listdir(cert_path)
-                if len(json_list_full) == 0:
-                    web_fallback == True
-            else:
-                web_fallback = True
+        if len(json_list_full)==0:
+            eos_path = base_cert_eos + cert_type + "/"
+            if os.path.isdir(eos_path):
+                json_list_full = os.listdir(eos_path)
         ## ... if not we go to the website
-        if web_fallback:
-            cert_url = base_cert_url + cert_type + "/"
-            json_list_full = get_url_clean(cert_url).split("\n")
+        if len(json_list_full)==0:
+            web_path = base_cert_url + cert_type + "/"
+            json_list_full = get_url_clean(web_path).split("\n")
         pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)\s|$", re.IGNORECASE)
         json_list = [match.group(1) for entry in json_list_full for match in [re.search(pattern, entry)] if match and match.group(1)]
         if len(json_list)==0:
             raise RuntimeError("No matching JSON files found from {source} ({path}). The full list was:\n{list_full}".format(
-                source="web" if web_fallback else "eos" if eos_fallback else "cvmfs",
-                path=cert_url if web_fallback else cert_path,
+                source="web" if web_path else "eos" if eos_path else "cvmfs",
+                path=web_path if web_path else eos_path if eos_path else cvmfs_path,
                 list_full='\n'.join(json_list_full),
             ))
 

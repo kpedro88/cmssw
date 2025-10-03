@@ -177,7 +177,7 @@ if __name__ == '__main__':
         latest_json = np.array(json_list[np.argmax(run_ranges)]).reshape(1,-1)[0].astype(str)
         best_json = str(latest_json[0])
         if not web_path:
-            with open(eos_path if eos_path else cvmfs_path + "/" + best_json) as js:
+            with open((eos_path if eos_path else cvmfs_path) + "/" + best_json) as js:
                 golden = json.load(js)
         else:
             golden = get_url_clean(web_path + best_json)

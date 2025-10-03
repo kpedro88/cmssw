@@ -161,7 +161,7 @@ if __name__ == '__main__':
         if len(json_list_full)==0:
             web_path = base_cert_url + cert_type + "/"
             json_list_full = get_url_clean(web_path).split("\n")
-        pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)\s|$", re.IGNORECASE)
+        pattern = re.compile("(cert_collisions\d{4}_\d*_\d*_golden.json)(\s|$)", re.IGNORECASE)
         json_list = [match.group(1) for entry in json_list_full for match in [re.search(pattern, entry)] if match and match.group(1)]
         if len(json_list)==0:
             raise RuntimeError("No matching JSON files found from {source} ({path}). The full list was:\n{list_full}".format(
@@ -176,11 +176,11 @@ if __name__ == '__main__':
         run_ranges = [int(c.split("_")[-2]) - int(c.split("_")[-3]) for c in json_list]
         latest_json = np.array(json_list[np.argmax(run_ranges)]).reshape(1,-1)[0].astype(str)
         best_json = str(latest_json[0])
-        if not web_fallback:
-            with open(cert_path + "/" + best_json) as js:
+        if not web_path:
+            with open(eos_path if eos_path else cvmfs_path + "/" + best_json) as js:
                 golden = json.load(js)
         else:
-            golden = get_url_clean(cert_url + best_json)
+            golden = get_url_clean(web_path + best_json)
             golden = ast.literal_eval(golden) #converts string to dict
         
         # skim for runs in input

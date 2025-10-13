@@ -135,7 +135,15 @@ def loadDigiAliases(process, premix=False):
                 #    ),
                 )
           )
-    
+
+    process.muonGEMDigis = cms.EDAlias(
+        simMuonGEMDigis = cms.VPSet(
+                cms.PSet(
+                    type = cms.string("GEMDetIdGEMDigiMuonDigiCollection")
+                    ),
+                )
+          )
+
 def loadTriggerDigiAliases(process):
     process.caloStage1LegacyFormatDigis = cms.EDAlias(
         **{ "simCaloStage1LegacyFormatDigis" :

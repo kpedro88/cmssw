@@ -33,6 +33,9 @@
 #include <iostream>
 #include <mutex>
 #include <vector>
+#include <iostream>
+#include <algorithm>
+#include <iterator>
 
 //#define DebugLog
 
@@ -68,6 +71,11 @@ void FastHFShowerLibrary::SetRandom(const RandomEngineAndDistribution* rnd) {
   G4Random::setTheEngine(&(rnd->theEngine()));
   LogDebug("FastHFShowerLibrary::recoHFShowerLibrary")
       << "Begin of event " << G4UniformRand() << "  " << rnd->theEngine().name() << "  " << rnd->theEngine();
+}
+
+template<typename Key, typename Value>
+std::ostream& operator<<(std::ostream& os, const std::pair<Key, Value>& p) {
+    return os << p.first.unitID() << ":" << p.second;
 }
 
 void FastHFShowerLibrary::recoHFShowerLibrary(const FSimTrack& myTrack, HFHitMaker* hitMaker) const {
@@ -122,6 +130,9 @@ void FastHFShowerLibrary::recoHFShowerLibrary(const FSimTrack& myTrack, HFHitMak
       }
     }  // end of isItinFidVolume check
   }  // end loop over hits
+  std::cout << "DEBUG hitMap (" << hitMap.size() << ") -> ";
+  std::copy(hitMap.begin(), hitMap.end(), std::ostream_iterator<std::pair<CaloHitID, float>>(std::cout, ", "));
+  std::cout << std::endl;
 }
 
 void FastHFShowerLibrary::modifyDepth(HcalNumberingFromDDD::HcalID& id) const {

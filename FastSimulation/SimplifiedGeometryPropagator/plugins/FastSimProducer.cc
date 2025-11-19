@@ -379,6 +379,8 @@ void FastSimProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(std::move(p6), "EcalHitsES");
   iEvent.put(std::move(p7), "HcalHits");
   iEvent.put(std::move(m1), "MuonSimTracks");
+
+  std::cout << "FastHFShowerLibrary::recoHFShowerLibrary: random state at end of event " << _randomEngine->theEngine().flat() << "  " << _randomEngine->theEngine().name() << "  " << _randomEngine->theEngine() << std::endl;
 }
 
 void FastSimProducer::endStream() { _randomEngine.reset(); }

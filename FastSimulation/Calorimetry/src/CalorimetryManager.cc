@@ -151,6 +151,7 @@ void CalorimetryManager::reconstructTrack(const FSimTrack& myTrack, RandomEngine
           HFHitMaker myHits;
           theHFShowerLibrary_->recoHFShowerLibrary(myTrack, &myHits);
           const auto& hfcorr = myHDResponse_->correctHF(myTrack.hcalEntrance().e(), abs(myTrack.type()));
+          std::cout << "updateHCAL: called by reconstructTrack" << std::endl;
           updateHCAL(myHits.hitMap(), myTrack.id(), container, 1., hfcorr.first, hfcorr.second);
         } else
           reconstructHCAL(myTrack, random, container);
@@ -371,6 +372,7 @@ void CalorimetryManager::EMShowerSimulation(const FSimTrack& myTrack, RandomEngi
   updateECAL(myGrid.getHits(), onEcal, myTrack.id(), container, scale);
 
   // Now fill the HCAL hits
+  std::cout << "updateHCAL: called by EMShowerSimulation" << std::endl;
   updateHCAL(myHcalHitMaker.getHits(), myTrack.id(), container);
 
   // finish with preshower
@@ -426,6 +428,7 @@ void CalorimetryManager::reconstructHCAL(const FSimTrack& myTrack, RandomEngineA
     CaloHitID current_id(cell.rawId(), tof, myTrack.id());
     std::map<CaloHitID, float> hitMap;
     hitMap[current_id] = emeas;
+    std::cout << "updateHCAL: called by reconstructHCAL" << std::endl;
     updateHCAL(hitMap, myTrack.id(), container);
   }
 }
@@ -642,9 +645,12 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
       // Save HCAL hits
       if (!myTrack.onEcal() && !myTrack.onHcal() && useShowerLibrary_) {
         const auto& hfcorr = myHDResponse_->correctHF(eGen, abs(myTrack.type()));
+        std::cout << "updateHCAL: called by HDShowerSimulation (useShowerLibrary)" << std::endl;
         updateHCAL(myHFHitMaker.hitMap(), myTrack.id(), container, 1., hfcorr.first, hfcorr.second);
-      } else
+      } else {
+        std::cout << "updateHCAL: called by HDShowerSimulation" << std::endl;
         updateHCAL(myHcalHitMaker.getHits(), myTrack.id(), container, correction * hcorr);
+      }
 
     } else {  // shower simulation failed
       if (myTrack.onHcal() || myTrack.onVFcal()) {
@@ -654,6 +660,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
         CaloHitID current_id(cell.rawId(), tof, myTrack.id());
         std::map<CaloHitID, float> hitMap;
         hitMap[current_id] = emeas;
+        std::cout << "updateHCAL: called by HDShowerSimulation (simulation failed)" << std::endl;
         updateHCAL(hitMap, myTrack.id(), container);
         if (debug_)
           LogInfo("FastCalorimetry") << " HCAL simple cell " << cell.rawId() << " added    E = " << emeas << std::endl;
@@ -838,6 +845,7 @@ void CalorimetryManager::MuonMipSimulation(const FSimTrack& myTrack, RandomEngin
   }
 
   // Save HCAL hits
+  std::cout << "updateHCAL: called by MuonMipSimulation" << std::endl;
   updateHCAL(myHcalHitMaker.getHits(), myTrack.id(), container);
 
   if (debug_)

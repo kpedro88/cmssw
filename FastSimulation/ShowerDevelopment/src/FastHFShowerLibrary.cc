@@ -126,6 +126,7 @@ void FastHFShowerLibrary::recoHFShowerLibrary(const FSimTrack& myTrack) {
       }
     }  // end of isItinFidVolume check
   }  // end loop over hits
+  std::cout << "recoHFShowerLibrary: hits.size() = " << hits.size() << ", hitMap.size() = " << hitMap.size() << std::endl;
 }
 
 void FastHFShowerLibrary::modifyDepth(HcalNumberingFromDDD::HcalID& id) {

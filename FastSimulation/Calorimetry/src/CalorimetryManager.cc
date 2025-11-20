@@ -649,6 +649,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
       if (myTrack.onVFcal() && useShowerLibrary_) {
         myHDResponse_->correctHF(eGen, abs(myTrack.type()));
         std::cout << "updateHCAL: called by HDShowerSimulation (useShowerLibrary)" << std::endl;
+        std::cout << "            track id = " << myTrack.id() << ", onEcal = " << myTrack.onEcal() << ", onHcal = " << myTrack.onHcal() << ", onVFcal = " << myTrack.onVFcal() << std::endl;
         updateHCAL(myHFHitMaker.hitMap(), myTrack.id(), container);
       } else {
         std::cout << "updateHCAL: called by HDShowerSimulation" << std::endl;

@@ -1041,6 +1041,7 @@ void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, in
     float energy = hit.second;
     energy *= corr;
 
+    bool debug = false;
     float time = hit.first.timeSlice();
     //put energy into uncalibrated state for digitizer && correct timing
     if (HcalDigitizer_) {
@@ -1052,6 +1053,7 @@ void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, in
         energy /= samplingHBHE_[hdetid.ietaAbs() - 1];  //re-convert to GeV
         time = timeShiftHE_[hdetid.ietaAbs() - ietaShiftHE_];
       } else if (hdetid.subdetId() == HcalForward) {
+        debug = true;
         if (useShowerLibrary_) {
           if (useCorrectionSL_) {
             if (hdetid.depth() == 1 or hdetid.depth() == 3)
@@ -1072,6 +1074,7 @@ void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, in
       }
     }
 
+    if (debug) std::cout << "updateHCAL: " << hit.first.unitID() << ", " << energy << ", " << time << ", " << trackID << std::endl;
     container.hitsHCAL->emplace_back(DetId(hit.first.unitID()),
                                      energy,
                                      time,

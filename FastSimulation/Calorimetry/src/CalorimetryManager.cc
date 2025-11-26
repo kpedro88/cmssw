@@ -152,6 +152,7 @@ void CalorimetryManager::reconstructTrack(const FSimTrack& myTrack, RandomEngine
           theHFShowerLibrary_->recoHFShowerLibrary(myTrack, &myHits);
           myHDResponse_->correctHF(myTrack.hcalEntrance().e(), abs(myTrack.type()));
           std::cout << "updateHCAL: called by reconstructTrack" << std::endl;
+          std::cout << "  correctHF: track id = " << myTrack.id() << ", E = " << myTrack.hcalEntrance().e() << ", type = " << abs(myTrack.type()) << std::endl;
           updateHCAL(myHits.hitMap(), myTrack.id(), container);
         } else
           reconstructHCAL(myTrack, random, container);
@@ -646,6 +647,7 @@ void CalorimetryManager::HDShowerSimulation(const FSimTrack& myTrack, RandomEngi
       if (!myTrack.onEcal() && !myTrack.onHcal() && useShowerLibrary_) {
         myHDResponse_->correctHF(eGen, abs(myTrack.type()));
         std::cout << "updateHCAL: called by HDShowerSimulation (useShowerLibrary)" << std::endl;
+        std::cout << "  correctHF: track id = " << myTrack.id() << ", E = " << eGen << ", type = " << abs(myTrack.type()) << std::endl;
         updateHCAL(myHFHitMaker.hitMap(), myTrack.id(), container);
       } else {
         std::cout << "updateHCAL: called by HDShowerSimulation" << std::endl;
@@ -1057,20 +1059,30 @@ void CalorimetryManager::updateHCAL(const std::map<CaloHitID, float>& hitMap, in
         energy /= samplingHBHE_[hdetid.ietaAbs() - 1];  //re-convert to GeV
         time = timeShiftHE_[hdetid.ietaAbs() - ietaShiftHE_];
       } else if (hdetid.subdetId() == HcalForward) {
+        std::cout << "    updateHCAL: " << hit.first.unitID() << ", " << energy << ", " << time << ", " << trackID << "; ";
         if (useShowerLibrary_) {
           if (useCorrectionSL_) {
-            if (hdetid.depth() == 1 or hdetid.depth() == 3)
+            if (hdetid.depth() == 1 or hdetid.depth() == 3){
+              std::cout << "hfcorrEM = " << hfcorrEm[hdetid.ietaAbs() - ietaShiftHF_];
               energy *= hfcorrEm[hdetid.ietaAbs() - ietaShiftHF_];
-            if (hdetid.depth() == 2 or hdetid.depth() == 4)
+            }
+            if (hdetid.depth() == 2 or hdetid.depth() == 4){
+              std::cout << "hfcorrHad = " << hfcorrHad[hdetid.ietaAbs() - ietaShiftHF_];
               energy *= hfcorrHad[hdetid.ietaAbs() - ietaShiftHF_];
+            }
           }
         } else {
-          if (hdetid.depth() == 1 or hdetid.depth() == 3)
+          if (hdetid.depth() == 1 or hdetid.depth() == 3){
+            std::cout << "samplingHF = " << samplingHF_[0];
             energy *= samplingHF_[0];
-          if (hdetid.depth() == 2 or hdetid.depth() == 4)
+          }
+          if (hdetid.depth() == 2 or hdetid.depth() == 4){
+            std::cout << "samplingHF = " << samplingHF_[1];
             energy *= samplingHF_[1];
+          }
           time = timeShiftHF_[hdetid.ietaAbs() - ietaShiftHF_];
         }
+        std::cout << std::endl;
       } else if (hdetid.subdetId() == HcalOuter) {
         energy /= samplingHO_[hdetid.ietaAbs() - 1];
         time = timeShiftHO_[hdetid.ietaAbs() - ietaShiftHO_];

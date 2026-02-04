@@ -159,9 +159,9 @@ private:
   static constexpr int32_t nLayerType_ = 7;
   static constexpr int32_t layerType_[nLayerType_] = {HGCalTypes::WaferCenter,
                                                       HGCalTypes::WaferCenterB,
-                                                      HGCalTypes::WaferCenterR,
                                                       HGCalTypes::CornerCenterYp,
                                                       HGCalTypes::CornerCenterYm,
+                                                      HGCalTypes::WaferCenterR,
                                                       HGCalTypes::CornerCenterXp,
                                                       HGCalTypes::CornerCenterXm};
   static constexpr std::string_view layerTypes_[nLayerType_] = {

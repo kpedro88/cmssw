@@ -43,12 +43,12 @@ int32_t HGCalTypes::layerType(int type) {
   return ((type >= 0) && (type < nLayerType_)) ? HGCalTypes::layerType_[type] : HGCalTypes::WaferCenter;
 }
 
-std::string HGCalTypes::layerTypeX(int32_t type) { return layerTypes_[HGCalTypes::layerType(type)]; }
+std::string_view HGCalTypes::layerTypeX(int32_t type) { return layerTypes_[HGCalTypes::layerType(type)]; }
 
-std::string HGCalTypes::waferType(int32_t type) {
+std::string_view HGCalTypes::waferType(int32_t type) {
   return (((type >= 0) && (type < nWaferType_)) ? HGCalTypes::waferType_[type] : "Undefined");
 }
 
-std::string HGCalTypes::waferTypeX(int32_t type) {
+std::string_view HGCalTypes::waferTypeX(int32_t type) {
   return (((type >= 0) && (type < nWaferTypeX_)) ? HGCalTypes::waferTypeX_[type] : "UnknownXX");
 }

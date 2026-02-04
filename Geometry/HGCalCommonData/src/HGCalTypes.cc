@@ -40,15 +40,15 @@ int32_t HGCalTypes::getUnpackedCellType6(int id) { return (id / faccell6_); }
 int32_t HGCalTypes::getUnpackedCell6(int id) { return (id % faccell6_); }
 
 int32_t HGCalTypes::layerType(int type) {
-  return ((type >= 0) && (type < 7)) ? HGCalTypes::layerType_[type] : HGCalTypes::WaferCenter;
+  return ((type >= 0) && (type < nLayerType_)) ? HGCalTypes::layerType_[type] : HGCalTypes::WaferCenter;
 }
 
 std::string HGCalTypes::layerTypeX(int32_t type) { return layerTypes_[HGCalTypes::layerType(type)]; }
 
 std::string HGCalTypes::waferType(int32_t type) {
-  return (((type >= 0) && (type < 4)) ? HGCalTypes::waferType_[type] : "Undefined");
+  return (((type >= 0) && (type < nWaferType_)) ? HGCalTypes::waferType_[type] : "Undefined");
 }
 
 std::string HGCalTypes::waferTypeX(int32_t type) {
-  return (((type >= 0) && (type < 27)) ? HGCalTypes::waferTypeX_[type] : "UnknownXX");
+  return (((type >= 0) && (type < nWaferTypeX_)) ? HGCalTypes::waferTypeX_[type] : "UnknownXX");
 }

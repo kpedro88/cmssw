@@ -1,4 +1,5 @@
 #include "Geometry/HGCalCommonData/interface/HGCalTypes.h"
+#include <iostream>
 
 int32_t HGCalTypes::packTypeUV(int type, int u, int v) {
   int32_t iu = std::abs(u);
@@ -39,11 +40,15 @@ int32_t HGCalTypes::getUnpackedCellType6(int id) { return (id / faccell6_); }
 
 int32_t HGCalTypes::getUnpackedCell6(int id) { return (id % faccell6_); }
 
-int32_t HGCalTypes::layerType(int type) {
-  return ((type >= 0) && (type < 7)) ? HGCalTypes::layerType_[type] : HGCalTypes::WaferCenter;
+int32_t HGCalTypes::layerType(int type, bool print) {
+  int32_t result = ((type >= 0) && (type < 7)) ? HGCalTypes::layerType_[type] : HGCalTypes::WaferCenter;
+  if (print)
+    std::cout << "HGCalTypes::layerType : layer = " << type << ", result = " << HGCalTypes::layerTypeX(type) << " ("
+              << result << ")" << std::endl;
+  return result;
 }
 
-std::string HGCalTypes::layerTypeX(int32_t type) { return layerTypes_[HGCalTypes::layerType(type)]; }
+std::string HGCalTypes::layerTypeX(int32_t type) { return layerTypes_[HGCalTypes::layerType(type, false)]; }
 
 std::string HGCalTypes::waferType(int32_t type) {
   return (((type >= 0) && (type < 4)) ? HGCalTypes::waferType_[type] : "Undefined");

@@ -133,7 +133,7 @@ public:
   static int32_t getUnpackedCellType6(int id);
   static int32_t getUnpackedCell6(int id);
   // Translate from flat file format to CMSSW format of Layer type
-  static int32_t layerType(int type);
+  static int32_t layerType(int type, bool print = true);
   // Get the front-back index from the layer orientation index
   static constexpr int32_t layerFrontBack(int32_t layerOrient) { return ((layerOrient == WaferCenterB) ? 1 : -1); }
   static constexpr int32_t waferFrontBack(int32_t index) { return ((index == 0) ? -1 : 1); }

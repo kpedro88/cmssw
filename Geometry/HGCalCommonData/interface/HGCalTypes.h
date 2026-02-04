@@ -156,17 +156,20 @@ private:
   static constexpr int32_t faccell_ = 100;
   static constexpr int32_t faccelltype_ = 10000;
   static constexpr int32_t faccell6_ = 1000;
-  static constexpr int32_t layerType_[7] = {HGCalTypes::WaferCenter,
-                                            HGCalTypes::WaferCenterB,
-                                            HGCalTypes::WaferCenterR,
-                                            HGCalTypes::CornerCenterYp,
-                                            HGCalTypes::CornerCenterYm,
-                                            HGCalTypes::CornerCenterXp,
-                                            HGCalTypes::CornerCenterXm};
-  static constexpr std::string layerTypes_[7] = {
+  static constexpr int32_t nLayerType_ = 7;
+  static constexpr int32_t layerType_[nLayerType_] = {HGCalTypes::WaferCenter,
+                                                      HGCalTypes::WaferCenterB,
+                                                      HGCalTypes::WaferCenterR,
+                                                      HGCalTypes::CornerCenterYp,
+                                                      HGCalTypes::CornerCenterYm,
+                                                      HGCalTypes::CornerCenterXp,
+                                                      HGCalTypes::CornerCenterXm};
+  static constexpr std::string layerTypes_[nLayerType_] = {
       "Center", "CenterB", "CenterYp", "CenterYm", "CenterR", "CenterXp", "CenterXm"};
-  static constexpr std::string waferType_[4] = {"HD120", "LD200", "LD300", "HD200"};
-  static constexpr std::string waferTypeX_[27] = {
+  static constexpr int32_t nWaferType_ = 4;
+  static constexpr std::string waferType_[nWaferType_] = {"HD120", "LD200", "LD300", "HD200"};
+  static constexpr int32_t nWaferTypeX_ = 27;
+  static constexpr std::string waferTypeX_[nWaferTypeX_] = {
       "Full",      "Five",      "ChopTwo",   "ChopTwoM", "Half",     "Semi",    "Semi2",   "Three",   "Half2",
       "Five2",     "Unknown10", "LDTop",     "LDBottom", "LDLeft",   "LDRight", "LDFive",  "LDThree", "Unknown17",
       "Unknown18", "Unknown19", "Unknown20", "HDTop",    "HDBottom", "HDLeft",  "HDRight", "HDFive",  "Out"};

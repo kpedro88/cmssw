@@ -27,9 +27,6 @@ opts.register("features", 10, VarParsing.VarParsing.multiplicity.singleton,
 opts.register("model", "PhysicsTools/PyTorch/test/data/aot_producer_model.pt2",
               VarParsing.VarParsing.multiplicity.singleton,
               VarParsing.VarParsing.varType.string, "FileInPath to the .pt2 model")
-opts.register("perStream", 0, VarParsing.VarParsing.multiplicity.singleton,
-              VarParsing.VarParsing.varType.int,
-              "control mode: each stream loads its own model copy (duplicates weights)")
 # parseArguments() chokes on no input file for the 'analysis' base; guard it.
 opts.inputFiles = []
 opts.parseArguments()
@@ -69,7 +66,6 @@ process.torchAOT = cms.EDProducer(
     batchSize=cms.int32(opts.batch),
     nFeatures=cms.int32(opts.features),
     nInferencePerEvent=cms.uint32(opts.ninfer),
-    perStreamModel=cms.bool(bool(opts.perStream)),
 )
 
 process.p = cms.Path(process.torchAOT)

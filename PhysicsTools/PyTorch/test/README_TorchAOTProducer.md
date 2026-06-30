@@ -9,14 +9,13 @@ CMSSW stream threads** — with memory cost O(model), not O(model × threads).
 - **`plugins/TorchAOTProducer.cc`** — `edm::stream::EDProducer<edm::GlobalCache<AOTCache>>`.
   `initializeGlobalCache()` loads one `cms::torch::ModelAOT`
   (`torch::inductor::AOTIModelPackageLoader`); every stream runs inference on that
-  same shared const model in `produce()`. A `perStreamModel` option switches to a
-  control mode where each stream loads its own copy (duplicating weights).
+  same shared const model in `produce()`.
 - **`test/make_aot_producer_model.py`** — exports an AOTInductor `.pt2`. Default is
   a tiny MLP; `--big` makes a ~0.5 GB-weight model. Run inside `cmsenv` so the
   in-release Python torch compiles the package with the CMS gcc (ABI-compatible
   with CMS libtorch).
 - **`test/torchAOTProducer_cfg.py`** — cmsRun config. Knobs: `nthreads`, `nevents`,
-  `ninfer`, `batch`, `features`, `model` (FileInPath), `perStream`. Loads
+  `ninfer`, `batch`, `features`, `model` (FileInPath). Loads
   `PyTorchService` (pins torch to 1 internal thread) and the `Timing` /
   `SimpleMemoryCheck` services for the memory summary.
 - **`test/scan_threads.sh`** — runs the config for 1/2/4/8 threads and tabulates
@@ -47,10 +46,9 @@ torch._inductor.aoti_compile_and_package(ep,package_path="data/aot_mid.pt2")
 PY
 
 M=PhysicsTools/PyTorch/test/data/aot_mid.pt2
-# shared (default): RSS barely grows with threads
+# shared GlobalCache: RSS barely grows with threads (weights loaded once)
+cmsRun torchAOTProducer_cfg.py nthreads=1 nevents=200 features=512 model=$M
 cmsRun torchAOTProducer_cfg.py nthreads=8 nevents=200 features=512 model=$M
-# control: RSS grows ~+model per thread
-cmsRun torchAOTProducer_cfg.py nthreads=8 nevents=200 features=512 model=$M perStream=1
 ```
 
 Inspect the `MemoryReport> Peak rss size ...` line and the `of which .so's ...

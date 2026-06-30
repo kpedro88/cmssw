@@ -6,3 +6,13 @@
   <use name="PhysicsTools/PyTorch"/>
   <flags EDM_PLUGIN="1"/>
 </library>
+
+<library file="TorchAOTProducer.cc" name="PhysicsToolsPyTorchTorchAOTProducer">
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/ParameterSet"/>
+  <use name="FWCore/PluginManager"/>
+  <use name="FWCore/Utilities"/>
+  <use name="FWCore/MessageLogger"/>
+  <use name="PhysicsTools/PyTorch"/>
+  <flags EDM_PLUGIN="1"/>
+</library>

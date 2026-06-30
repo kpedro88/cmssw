@@ -2,6 +2,7 @@
 <test name="pytorch-test_simple_dnn"   command="test_simple_dnn.py .">
   <flags PRE_TEST="pytorch-create_simple_dnn"/>
 </test>
+<test name="pytorch-torchAOT-memtest"  command="run_torchAOT_memtest.sh"/>
 <test name="test-torch-tensor-cpu"     command="torch-tensor.py cpu"/>
 <test name="test-torch-tensor"         command="torch-tensor.py"/>
 <test name="test-torch-control-flow"   command="torch-control-flow.py"/>
